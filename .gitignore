@@ -11,6 +11,7 @@ venv/
 # Testing
 sandbox-repo/
 sandbox-worktrees/
+repos/
 
 # IDE
 .vscode/

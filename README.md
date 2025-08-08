@@ -134,15 +134,59 @@ gh pr create
 
 ## Development
 
+### Setup
+
+```bash
+# Install dev dependencies
+uv sync --dev
+
+# Or if you've activated the venv
+uv pip install -e ".[dev]"
+```
+
+### Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_init.py
+
+# Run with coverage
+pytest --cov=multiclaude
+```
+
+### Manual Testing with Sandbox
+
+```bash
+# Reset sandbox environment
+sandbox-admin reset          # Create fresh sandbox repo and initialize
+
+# Run multiclaude commands in sandbox
+mc-sandbox list             # List tasks in sandbox
+mc-sandbox new test-feature --no-launch  # Create task in sandbox
+mc-sandbox init             # Initialize (if needed)
+
+# Check sandbox status
+sandbox-admin status        # Show sandbox state
+sandbox-admin clean         # Clean worktrees only
+```
+
+### Code Quality
+
 ```bash
 # Format code
-ruff format multiclaude.py
+ruff format multiclaude/
 
 # Lint
-ruff check multiclaude.py
+ruff check multiclaude/
 
-# Run directly
-python multiclaude.py --help
+# Run type checking (if using mypy)
+mypy multiclaude/
 ```
 
 ## Roadmap

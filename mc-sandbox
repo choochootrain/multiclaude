@@ -1,8 +1,0 @@
-#!/bin/bash
-# Run multiclaude commands in sandbox environment
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export MULTICLAUDE_WORKTREE_DIR="$SCRIPT_DIR/sandbox-worktrees"
-
-# Change to sandbox repo and run multiclaude
-cd "$SCRIPT_DIR/sandbox-repo" && python "$SCRIPT_DIR/multiclaude.py" "$@"

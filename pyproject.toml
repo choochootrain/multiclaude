@@ -7,10 +7,12 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv]
-dev-dependencies = []
+dev-dependencies = ["pytest>=8.0.0"]
 
 [project.scripts]
 multiclaude = "multiclaude:main"
+mc-sandbox = "multiclaude.mc_sandbox:main"
+sandbox-admin = "multiclaude.sandbox_admin:main"
 
 [build-system]
 requires = ["hatchling"]
