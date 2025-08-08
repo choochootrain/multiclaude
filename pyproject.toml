@@ -1,0 +1,25 @@
+[project]
+name = "multiclaude"
+version = "0.1.0"
+description = "CLI tool for managing parallel Claude Code instances with git worktrees"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+dev-dependencies = []
+
+[project.scripts]
+multiclaude = "multiclaude:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]  # line too long - we set line-length instead

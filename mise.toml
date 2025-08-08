@@ -1,0 +1,7 @@
+[tools]
+python = "latest"
+uv = "latest"
+ruff = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
