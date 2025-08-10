@@ -1,14 +1,13 @@
 """Environment creation strategies for multiclaude."""
 
 import abc
-import os
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Protocol
 
 from .errors import MultiClaudeError
-from .git_utils import get_repo_name, get_environment_base_dir
+from .git_utils import get_environment_base_dir, get_repo_name
 
 
 class EnvironmentStrategy(Protocol):
@@ -71,10 +70,8 @@ class WorktreeStrategy(EnvironmentStrategy):
             text=True,
             check=False,
         )
-        if result.returncode != 0:
-            # It might already be removed, check for "No such worktree"
-            if "No such worktree" not in result.stderr:
-                raise MultiClaudeError(f"Failed to remove worktree: {result.stderr}")
+        if result.returncode != 0 and "No such worktree" not in result.stderr:
+            raise MultiClaudeError(f"Failed to remove worktree: {result.stderr}")
 
 
 class CloneStrategy(EnvironmentStrategy):

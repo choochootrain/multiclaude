@@ -34,5 +34,20 @@ mc-sandbox new test  # Run multiclaude in sandbox
 
 Sandbox location: `repos/sandbox/main/` (repo), `repos/sandbox/worktrees/` (environments)
 
+## Code Quality
+
+When completing tasks, always run linting and formatting:
+
+```bash
+# Check and fix linting issues
+ruff check --fix multiclaude/
+
+# Format code consistently  
+ruff format multiclaude/
+
+# Run tests to ensure nothing broke
+pytest
+```
+
 ## Environment Variables
 - `MULTICLAUDE_ENVIRONMENT_DIR` - Override default environment location (used in tests and sandbox)

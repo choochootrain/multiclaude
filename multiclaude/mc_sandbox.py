@@ -13,10 +13,10 @@ def main() -> None:
     script_dir = Path(__file__).parent.parent
     sandbox_repo = script_dir / "repos" / "sandbox" / "main"
     sandbox_worktrees = script_dir / "repos" / "sandbox" / "worktrees"
-    
+
     # Set environment variable for environment directory
     os.environ["MULTICLAUDE_ENVIRONMENT_DIR"] = str(sandbox_worktrees)
-    
+
     # Change to sandbox repo
     if sandbox_repo.exists():
         os.chdir(sandbox_repo)
@@ -24,7 +24,7 @@ def main() -> None:
         print(f"Error: Sandbox repo not found at {sandbox_repo}", file=sys.stderr)
         print("Run 'sandbox-admin reset' to create it.", file=sys.stderr)
         sys.exit(1)
-    
+
     # Run multiclaude with the same arguments
     multiclaude_main()
 

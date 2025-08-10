@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import MultiClaudeError, NotInitializedError
-from .git_utils import branch_exists, get_repo_name, get_environment_base_dir, is_git_repo
+from .git_utils import branch_exists, is_git_repo
 from .strategies import get_strategy
 
 
@@ -128,14 +128,14 @@ class TaskManager:
         return None
 
 
-
-
 def cmd_init(args: argparse.Namespace) -> None:
     """Initialize multiclaude in current repository."""
     repo_root = Path.cwd()
 
     if not is_git_repo(repo_root):
-        print("Error: Not a git repository. Please run this command in a git repo.", file=sys.stderr)
+        print(
+            "Error: Not a git repository. Please run this command in a git repo.", file=sys.stderr
+        )
         sys.exit(1)
 
     config = MultiClaudeConfig(repo_root)
@@ -148,8 +148,8 @@ def cmd_init(args: argparse.Namespace) -> None:
     task_mgr.initialize()
 
     print("✓ Initialized multiclaude in this repository")
-    print(f"✓ Created .multiclaude/ directory")
-    print(f"✓ Added .multiclaude to .git/info/exclude")
+    print("✓ Created .multiclaude/ directory")
+    print("✓ Added .multiclaude to .git/info/exclude")
 
 
 def cmd_new(args: argparse.Namespace) -> None:
@@ -237,7 +237,7 @@ def cmd_list(args: argparse.Namespace) -> None:
         else:
             # Check if environment still exists
             environment_exists = Path(task.environment_path).expanduser().exists()
-            
+
             if not environment_exists:
                 task.status = "missing"
             active_tasks.append(task)
@@ -264,13 +264,8 @@ def cmd_list(args: argparse.Namespace) -> None:
         for task in pruned_tasks:
             pruned = datetime.fromisoformat(task.pruned_at or task.created_at)
             age = datetime.now() - pruned
-            if age.days > 0:
-                age_str = f"{age.days}d ago"
-            else:
-                age_str = f"{age.seconds // 3600}h ago"
+            age_str = f"{age.days}d ago" if age.days > 0 else f"{age.seconds // 3600}h ago"
             print(f"  - {task.branch}: branch {task.branch} (pruned {age_str})")
-
-
 
 
 def main() -> None:
@@ -286,7 +281,9 @@ def main() -> None:
 
     # new command
     parser_new = subparsers.add_parser("new", help="Create new task with isolated environment")
-    parser_new.add_argument("branch_name", help="Branch name for the task (mc- prefix added automatically)")
+    parser_new.add_argument(
+        "branch_name", help="Branch name for the task (mc- prefix added automatically)"
+    )
     parser_new.add_argument("--no-launch", action="store_true", help="Don't launch Claude Code")
     parser_new.set_defaults(func=cmd_new)
 
@@ -294,7 +291,6 @@ def main() -> None:
     parser_list = subparsers.add_parser("list", help="List all multiclaude tasks")
     parser_list.add_argument("--show-pruned", action="store_true", help="Show pruned tasks")
     parser_list.set_defaults(func=cmd_list)
-
 
     args = parser.parse_args()
 

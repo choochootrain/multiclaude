@@ -32,5 +32,3 @@ def branch_exists(repo_root: Path, branch_name: str) -> bool:
         cwd=repo_root,
     )
     return bool(result.stdout.strip())
-
-

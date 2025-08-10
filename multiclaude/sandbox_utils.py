@@ -1,11 +1,8 @@
 """Utilities for managing sandbox environments for testing."""
 
-import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
-from typing import Optional
 
 
 class SandboxManager:
@@ -13,7 +10,7 @@ class SandboxManager:
 
     def __init__(self, base_path: Path, name: str):
         """Initialize sandbox manager.
-        
+
         Args:
             base_path: Base directory for sandbox (e.g., repos/)
             name: Name of sandbox (e.g., "sandbox" or "test-init-123456")
@@ -40,14 +37,14 @@ class SandboxManager:
         # Create initial commit
         readme = self.repo_path / "README.md"
         readme.write_text(f"# Test Repository - {self.name}\n")
-        
+
         subprocess.run(
             ["git", "add", "README.md"],
             cwd=self.repo_path,
             check=True,
             capture_output=True,
         )
-        
+
         subprocess.run(
             ["git", "commit", "-m", "Initial commit"],
             cwd=self.repo_path,
@@ -65,7 +62,6 @@ class SandboxManager:
         sandbox_dir = self.base_path / self.name
         if sandbox_dir.exists():
             shutil.rmtree(sandbox_dir)
-
 
     @property
     def exists(self) -> bool:
