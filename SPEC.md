@@ -180,25 +180,51 @@ Remove a task's worktree and optionally delete its branch.
 
 ## Phase Plan
 
-### Phase 1 - MVP (WIP)
+### Phase 1 - MVP (COMPLETED)
 **Goal:** Basic functionality to create and manage parallel Claude tasks
 
 **Features:**
-- [ ] `init` - Initialize multiclaude
-- [ ] `new <branch-name>` - Create task with worktree and launch Claude
-- [ ] `list` - Show all tasks
+- [x] `init` - Initialize multiclaude
+- [x] `new <branch-name>` - Create task with worktree and launch Claude
+- [x] `list` - Show all tasks
 
 **Technical:**
 - Simple JSON metadata storage
 - Direct git CLI integration
 - Basic error handling
 
-### Phase 1.5 - Branch Name Inference (TODO)
-**Goal:** Better UX for creating tasks
+### Phase 1.25 - Swappable Environment Creation Strategy (WIP)
+**Goal:** Refactor to support multiple git strategies with easy switching
 
 **Features:**
-- [ ] Infer branch name from task description
-- [ ] `new "add dark mode"` → `mc-add-dark-mode`
+- [ ] Create strategy abstraction layer for environment creation
+- [ ] Keep existing worktree strategy implementation
+- [ ] Implement new Direct Clone-to-Clone strategy
+- [ ] Configuration-based strategy selection
+- [ ] Support repositories with submodules (clone strategy only)
+- [ ] Maintain existing user interface (no breaking changes)
+
+**Technical:**
+- Abstract strategy interface for environment creation/deletion
+- Worktree strategy: existing git worktree implementation
+- Clone strategy: full repository clones with push/pull workflow (DEFAULT)
+- Strategy selection via config.json or environment variable
+- Manual submodule branch checkout for clone strategy
+- Easy extensibility for future strategies
+
+### Phase 1.33 - Environment Preparation Hooks
+**Goal:** Automated post-clone environment setup
+
+**Features:**
+- [ ] `.multiclaude/config.json` support for `"prepare_environment"` hook
+- [ ] Post-clone script execution (e.g., `npm install`, build tools)
+- [ ] Hook failure handling and error reporting
+- [ ] Manual configuration support (no CLI yet)
+
+**Technical:**
+- Configurable post-clone scripts in config.json
+- Script execution in task worktree directory
+- Failure detection and rollback handling
 
 ### Phase 2 - Enhanced Status (TODO)
 **Goal:** Better visibility into task status
@@ -254,6 +280,8 @@ Remove a task's worktree and optionally delete its branch.
 - [ ] Auto-cleanup after merge
 
 ### Future Phases (Backlog/Unplanned)
+- [ ] Branch name inference (`new "add dark mode"` → `mc-add-dark-mode`)
+- [ ] CLI for configuring config.json
 - [ ] Task dependencies/sequencing
 - [ ] MCP integrations
 - [ ] Remote execution
