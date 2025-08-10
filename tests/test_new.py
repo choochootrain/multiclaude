@@ -21,21 +21,21 @@ def test_new_creates_task(isolated_repo):
     args_new = SimpleNamespace(branch_name="test-feature", no_launch=True)
     multiclaude.cmd_new(args_new)
 
-    # Check worktree was created
-    worktree_dir = os.environ.get("MULTICLAUDE_WORKTREE_DIR")
-    expected_worktree = Path(worktree_dir) / repo_path.name / "mc-test-feature"
-    assert expected_worktree.exists()
-    assert (expected_worktree / ".git").exists()
-    assert (expected_worktree / "README.md").exists()
-
-    # Check branch was created
-    branches_result = subprocess.run(
-        ["git", "branch"],
-        cwd=repo_path,
+    # Check environment was created
+    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
+    expected_environment = Path(environment_dir) / repo_path.name / "mc-test-feature"
+    assert expected_environment.exists()
+    assert (expected_environment / ".git").exists()
+    assert (expected_environment / "README.md").exists()
+    
+    # Check that we're on the correct branch in the environment
+    env_branch_result = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=expected_environment,
         capture_output=True,
         text=True,
     )
-    assert "mc-test-feature" in branches_result.stdout
+    assert env_branch_result.stdout.strip() == "mc-test-feature"
 
     # Check tasks.json was updated
     tasks_file = repo_path / ".multiclaude" / "tasks.json"
@@ -45,7 +45,7 @@ def test_new_creates_task(isolated_repo):
     assert task["id"] == "mc-test-feature"
     assert task["branch"] == "mc-test-feature"
     assert task["status"] == "active"
-    assert task["worktree_path"] == str(expected_worktree)
+    assert task["environment_path"] == str(expected_environment)
     assert "created_at" in task
 
 
@@ -87,7 +87,7 @@ def test_new_no_launch_flag(isolated_repo, capsys):
     # Check output shows it didn't launch
     captured = capsys.readouterr()
     assert "Launching Claude Code" not in captured.out
-    assert "Created worktree" in captured.out
+    assert "Created isolated environment" in captured.out
 
 
 def test_new_would_launch_claude(isolated_repo, capsys):
@@ -105,4 +105,4 @@ def test_new_would_launch_claude(isolated_repo, capsys):
     # Check output shows it tried to launch
     captured = capsys.readouterr()
     assert "Launching Claude Code" in captured.out
-    assert "Created worktree" in captured.out
+    assert "Created isolated environment" in captured.out

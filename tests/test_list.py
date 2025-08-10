@@ -84,11 +84,11 @@ def test_list_detects_missing_worktree(isolated_repo, capsys):
     args_new = SimpleNamespace(branch_name="feature", no_launch=True)
     multiclaude.cmd_new(args_new)
     
-    # Manually delete the worktree directory (simulate external deletion)
-    worktree_dir = os.environ.get("MULTICLAUDE_WORKTREE_DIR")
-    worktree_path = Path(worktree_dir) / repo_path.name / "mc-feature"
-    if worktree_path.exists():
-        shutil.rmtree(worktree_path)
+    # Manually delete the environment directory (simulate external deletion)
+    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
+    environment_path = Path(environment_dir) / repo_path.name / "mc-feature"
+    if environment_path.exists():
+        shutil.rmtree(environment_path)
     
     # Also remove from git worktrees
     subprocess.run(

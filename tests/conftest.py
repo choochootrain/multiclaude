@@ -33,10 +33,10 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
     subprocess.run(["git", "add", "README.md"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True, check=True)
     
-    # Set worktree directory for tests
-    worktree_dir = tmp_path / "worktrees"
-    worktree_dir.mkdir(exist_ok=True)
-    monkeypatch.setenv("MULTICLAUDE_WORKTREE_DIR", str(worktree_dir))
+    # Set environment directory for tests
+    environment_dir = tmp_path / "environments"
+    environment_dir.mkdir(exist_ok=True)
+    monkeypatch.setenv("MULTICLAUDE_ENVIRONMENT_DIR", str(environment_dir))
     
     # Change to repo directory
     monkeypatch.chdir(repo_path)

@@ -1,6 +1,6 @@
 # Multiclaude
 
-CLI tool for managing parallel Claude Code instances using git worktrees. Work on multiple tasks concurrently without conflicts.
+CLI tool for managing parallel Claude Code instances using isolated environments. Work on multiple tasks concurrently without conflicts.
 
 ## Installation
 
@@ -57,17 +57,17 @@ This creates a `.multiclaude/` directory to track tasks and adds it to `.git/inf
 ### Create a new task
 
 ```bash
-# Create worktree and launch Claude Code
+# Create isolated environment and launch Claude Code
 multiclaude new feature-xyz
 
-# Create worktree without launching Claude
+# Create isolated environment without launching Claude
 multiclaude new bugfix-123 --no-launch
 ```
 
 This will:
 1. Create a new branch `mc-feature-xyz`
-2. Set up a worktree at `~/multiclaude-worktrees/<repo-name>/mc-feature-xyz/`
-3. Launch Claude Code in the worktree directory
+2. Set up an isolated environment at `~/multiclaude-environments/<repo-name>/mc-feature-xyz/`
+3. Launch Claude Code in the environment directory
 4. You can then provide task details directly to Claude
 
 ### List tasks
@@ -89,9 +89,9 @@ Active multiclaude tasks:
 
 ## How It Works
 
-1. Each task gets its own git worktree - an isolated working directory with its own branch
-2. Claude Code runs in the worktree, allowing parallel development without conflicts
-3. Worktrees are stored outside the main repository to avoid nesting issues
+1. Each task gets its own isolated environment - a working directory with its own branch
+2. Claude Code runs in the isolated environment, allowing parallel development without conflicts
+3. Environments are stored outside the main repository to avoid nesting issues
 4. Task metadata is tracked in `.multiclaude/tasks.json`
 
 ## Directory Structure
@@ -103,7 +103,7 @@ your-repo/
 │   └── tasks.json
 └── ... your code ...
 
-~/multiclaude-worktrees/    # Worktrees location
+~/multiclaude-environments/    # Environments location
 └── your-repo/
     ├── mc-feature-1/
     └── mc-feature-2/
@@ -124,8 +124,8 @@ multiclaude new auth-bugfix
 # Check on all tasks
 multiclaude list
 
-# When done, create PRs from each worktree
-cd ~/multiclaude-worktrees/my-repo/mc-dark-mode
+# When done, create PRs from each environment
+cd ~/multiclaude-environments/my-repo/mc-dark-mode
 git add -A
 git commit -m "Add dark mode support"
 git push -u origin mc-dark-mode
@@ -173,7 +173,7 @@ mc-sandbox init             # Initialize (if needed)
 
 # Check sandbox status
 sandbox-admin status        # Show sandbox state
-sandbox-admin clean         # Clean worktrees only
+sandbox-admin clean         # Clean environments only
 ```
 
 ### Code Quality

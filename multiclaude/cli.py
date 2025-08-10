@@ -11,35 +11,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
-class MultiClaudeError(Exception):
-    """Base exception for multiclaude errors."""
-
-    pass
-
-
-class NotGitRepoError(MultiClaudeError):
-    """Raised when not in a git repository."""
-
-    pass
-
-
-class NotInitializedError(MultiClaudeError):
-    """Raised when multiclaude is not initialized."""
-
-    pass
-
-
-class ClaudeNotFoundError(MultiClaudeError):
-    """Raised when Claude Code is not installed."""
-
-    pass
-
-
-class BranchExistsError(MultiClaudeError):
-    """Raised when branch already exists."""
-
-    pass
+from .errors import MultiClaudeError, NotInitializedError
+from .git_utils import branch_exists, get_repo_name, get_environment_base_dir, is_git_repo
+from .strategies import get_strategy
 
 
 @dataclass
@@ -50,7 +24,7 @@ class Task:
     branch: str
     created_at: str
     status: str
-    worktree_path: str
+    environment_path: str
     pruned_at: str | None = None
 
     @classmethod
@@ -80,6 +54,7 @@ class MultiClaudeConfig:
             "repo_root": str(self.repo_root),
             "default_branch": self._get_default_branch(),
             "created_at": datetime.now().isoformat(),
+            "environment_strategy": "clone",
         }
 
         self.config_file.write_text(json.dumps(config, indent=2))
@@ -105,6 +80,7 @@ class MultiClaudeConfig:
                 capture_output=True,
                 text=True,
                 check=False,
+                cwd=self.repo_root,
             )
             if result.returncode == 0:
                 # refs/remotes/origin/main -> main
@@ -152,88 +128,13 @@ class TaskManager:
         return None
 
 
-class GitWorktreeManager:
-    """Manages git worktree operations."""
-
-    def __init__(self, repo_root: Path):
-        self.repo_root = repo_root
-
-    def is_git_repo(self) -> bool:
-        """Check if current directory is a git repository."""
-        return (self.repo_root / ".git").exists()
-
-    def branch_exists(self, branch_name: str) -> bool:
-        """Check if branch already exists."""
-        result = subprocess.run(
-            ["git", "branch", "--list", branch_name],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        return bool(result.stdout.strip())
-
-    def create_worktree(self, worktree_path: Path, branch_name: str) -> None:
-        """Create a new worktree with branch."""
-        # Create parent directories if needed
-        worktree_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create worktree with new branch
-        result = subprocess.run(
-            ["git", "worktree", "add", str(worktree_path), "-b", branch_name],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            raise MultiClaudeError(f"Failed to create worktree: {result.stderr}")
-
-    def list_worktrees(self) -> list[dict[str, str]]:
-        """List all worktrees."""
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        worktrees = []
-        current = {}
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                if current:
-                    worktrees.append(current)
-                    current = {}
-            elif line.startswith("worktree "):
-                current["path"] = line[9:]
-            elif line.startswith("branch "):
-                current["branch"] = line[7:].replace("refs/heads/", "")
-
-        if current:
-            worktrees.append(current)
-
-        return worktrees
-
-
-def get_repo_name(repo_root: Path) -> str:
-    """Get repository name from path."""
-    return repo_root.name
-
-
-def get_worktree_base_dir() -> Path:
-    """Get base directory for worktrees."""
-    # Check environment variable first
-    if env_dir := os.environ.get("MULTICLAUDE_WORKTREE_DIR"):
-        return Path(env_dir)
-    return Path.home() / "multiclaude-worktrees"
 
 
 def cmd_init(args: argparse.Namespace) -> None:
     """Initialize multiclaude in current repository."""
     repo_root = Path.cwd()
-    git_mgr = GitWorktreeManager(repo_root)
 
-    if not git_mgr.is_git_repo():
+    if not is_git_repo(repo_root):
         print("Error: Not a git repository. Please run this command in a git repo.", file=sys.stderr)
         sys.exit(1)
 
@@ -252,13 +153,17 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 
 def cmd_new(args: argparse.Namespace) -> None:
-    """Create new task with worktree and launch Claude."""
+    """Create new task with isolated environment and launch Claude."""
     repo_root = Path.cwd()
-    config = MultiClaudeConfig(repo_root)
+    mc_config = MultiClaudeConfig(repo_root)
 
-    if not config.exists():
+    if not mc_config.exists():
         print("Error: Multiclaude not initialized. Run 'multiclaude init' first.", file=sys.stderr)
         sys.exit(1)
+
+    config = mc_config.load()
+    strategy_name = config.get("environment_strategy", "clone")
+    strategy = get_strategy(strategy_name)
 
     # Check if claude is installed
     claude_check = subprocess.run(
@@ -272,21 +177,15 @@ def cmd_new(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     branch_name = f"mc-{args.branch_name}"
-    git_mgr = GitWorktreeManager(repo_root)
 
-    if git_mgr.branch_exists(branch_name):
+    if branch_exists(repo_root, branch_name):
         print(f"Error: Branch '{branch_name}' already exists.", file=sys.stderr)
         sys.exit(1)
 
-    # Create worktree path
-    repo_name = get_repo_name(repo_root)
-    worktree_base = get_worktree_base_dir()
-    worktree_path = worktree_base / repo_name / branch_name
-
-    print(f"Creating worktree at {worktree_path}...")
+    print(f"Creating new isolated environment for '{branch_name}' using strategy: {strategy.name}")
 
     try:
-        git_mgr.create_worktree(worktree_path, branch_name)
+        environment_path = strategy.create(repo_root, branch_name)
     except MultiClaudeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -297,21 +196,19 @@ def cmd_new(args: argparse.Namespace) -> None:
         branch=branch_name,
         created_at=datetime.now().isoformat(),
         status="active",
-        worktree_path=str(worktree_path),
+        environment_path=str(environment_path),
     )
     task_mgr = TaskManager(repo_root)
     task_mgr.add_task(task)
 
-    print(f"✓ Created worktree for branch '{branch_name}'")
+    print(f"✓ Created isolated environment for branch '{branch_name}' at {environment_path}")
 
     if not args.no_launch:
-        print(f"Launching Claude Code in {worktree_path}...")
-        os.chdir(worktree_path)
+        print(f"Launching Claude Code in {environment_path}...")
+        os.chdir(environment_path)
         subprocess.run(["claude"], check=False)
     else:
-        print(f"Changing to worktree directory: {worktree_path}")
-        # Can't actually change parent's directory, but we can print instruction
-        print(f"Run: cd {worktree_path}")
+        print(f"To start working, run: cd {environment_path}")
 
 
 def cmd_list(args: argparse.Namespace) -> None:
@@ -330,11 +227,6 @@ def cmd_list(args: argparse.Namespace) -> None:
         print("No multiclaude tasks found.")
         return
 
-    # Get actual worktrees
-    git_mgr = GitWorktreeManager(repo_root)
-    worktrees = git_mgr.list_worktrees()
-    worktree_branches = {wt.get("branch") for wt in worktrees if wt.get("branch")}
-
     # Separate active and pruned tasks
     active_tasks = []
     pruned_tasks = []
@@ -343,8 +235,10 @@ def cmd_list(args: argparse.Namespace) -> None:
         if task.status == "pruned":
             pruned_tasks.append(task)
         else:
-            # Check if worktree still exists
-            if task.branch not in worktree_branches:
+            # Check if environment still exists
+            environment_exists = Path(task.environment_path).expanduser().exists()
+            
+            if not environment_exists:
                 task.status = "missing"
             active_tasks.append(task)
 
@@ -377,10 +271,12 @@ def cmd_list(args: argparse.Namespace) -> None:
             print(f"  - {task.branch}: branch {task.branch} (pruned {age_str})")
 
 
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Multiclaude - Manage parallel Claude Code instances with git worktrees"
+        description="Multiclaude - Manage parallel Claude Code instances with isolated environments"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -389,7 +285,7 @@ def main() -> None:
     parser_init.set_defaults(func=cmd_init)
 
     # new command
-    parser_new = subparsers.add_parser("new", help="Create new task with worktree")
+    parser_new = subparsers.add_parser("new", help="Create new task with isolated environment")
     parser_new.add_argument("branch_name", help="Branch name for the task (mc- prefix added automatically)")
     parser_new.add_argument("--no-launch", action="store_true", help="Don't launch Claude Code")
     parser_new.set_defaults(func=cmd_new)
@@ -398,6 +294,7 @@ def main() -> None:
     parser_list = subparsers.add_parser("list", help="List all multiclaude tasks")
     parser_list.add_argument("--show-pruned", action="store_true", help="Show pruned tasks")
     parser_list.set_defaults(func=cmd_list)
+
 
     args = parser.parse_args()
 

@@ -22,7 +22,7 @@ def cmd_reset(args: argparse.Namespace) -> None:
     original_dir = os.getcwd()
     try:
         os.chdir(sandbox.repo_path)
-        os.environ["MULTICLAUDE_WORKTREE_DIR"] = str(sandbox.worktree_path)
+        os.environ["MULTICLAUDE_ENVIRONMENT_DIR"] = str(sandbox.worktree_path)
         
         # Import and run init directly
         from multiclaude.cli import cmd_init
@@ -39,7 +39,7 @@ def cmd_reset(args: argparse.Namespace) -> None:
     if result.returncode == 0:
         print("✓ Sandbox reset complete")
         print(f"  Repo: {sandbox.repo_path}")
-        print(f"  Worktrees: {sandbox.worktree_path}")
+        print(f"  Environments: {sandbox.worktree_path}")
     else:
         print(f"Error initializing multiclaude: {result.stderr}")
         sys.exit(1)

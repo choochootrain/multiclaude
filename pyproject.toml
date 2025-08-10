@@ -1,7 +1,7 @@
 [project]
 name = "multiclaude"
 version = "0.1.0"
-description = "CLI tool for managing parallel Claude Code instances with git worktrees"
+description = "CLI tool for managing parallel Claude Code instances with isolated environments"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

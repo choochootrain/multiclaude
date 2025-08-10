@@ -93,7 +93,7 @@ Remove a task's worktree and optionally delete its branch.
 
 **Worktrees (external directory):**
 ```
-~/multiclaude-worktrees/        # Configurable base directory
+~/multiclaude-environments/        # Configurable base directory
 └── <repo-name>/
     ├── mc-task-1/
     └── mc-task-2/
@@ -119,7 +119,7 @@ Remove a task's worktree and optionally delete its branch.
     "branch": "mc-dark-mode",
     "created_at": "2024-01-01T10:00:00Z",
     "status": "active",
-    "worktree_path": "~/multiclaude-worktrees/my-repo/mc-dark-mode"
+    "worktree_path": "~/multiclaude-environments/my-repo/mc-dark-mode"
   },
   {
     "id": "mc-old-task",
@@ -127,7 +127,7 @@ Remove a task's worktree and optionally delete its branch.
     "created_at": "2024-01-01T08:00:00Z",
     "status": "pruned",
     "pruned_at": "2024-01-01T12:00:00Z",
-    "worktree_path": "~/multiclaude-worktrees/my-repo/mc-old-task"
+    "worktree_path": "~/multiclaude-environments/my-repo/mc-old-task"
   }
 ]
 ```
@@ -135,7 +135,7 @@ Remove a task's worktree and optionally delete its branch.
 ### Git Worktree Integration
 
 **Worktree naming convention:**
-- Location: `~/multiclaude-worktrees/<repo-name>/<branch-name>`
+- Location: `~/multiclaude-environments/<repo-name>/<branch-name>`
 - Branch: `mc-<branch-name>`
 
 **Detection of multiclaude worktrees:**
@@ -253,16 +253,16 @@ Remove a task's worktree and optionally delete its branch.
 
 **Features:**
 - [ ] Custom command to update CLAUDE.md with learnings
-- [ ] Sync findings across worktrees
+- [ ] Sync findings across environments
 
 ### Phase 4 - Environment Setup (TODO)
-**Goal:** Automated worktree environment preparation
+**Goal:** Automated environment preparation
 
 **Features:**
 - [ ] Auto-install dependencies (npm, pip, etc.)
-- [ ] Setup tooling per worktree
+- [ ] Setup tooling per environment
 - [ ] Task templates/commands
-- [ ] Copy CLAUDE.local.md to worktrees
+- [ ] Copy CLAUDE.local.md to environments
 
 ### Phase 4.5 - Cost Tracking (TODO)
 **Goal:** Monitor Claude usage per task
