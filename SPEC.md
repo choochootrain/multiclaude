@@ -212,6 +212,22 @@ Remove a task's worktree and optionally delete its branch.
 - Manual submodule branch checkout for clone strategy
 - Easy extensibility for future strategies
 
+### Phase 1.28 - Resume Task Command
+**Goal:** Allow users to resume work on existing tasks
+
+**Features:**
+- [ ] `resume <task-name>` - Change to task environment and resume Claude conversation
+- [ ] Change working directory to task's environment
+- [ ] Launch Claude Code with `/resume` to continue previous chat
+- [ ] Support resuming by partial task name match
+- [ ] Error handling for non-existent tasks
+
+**Technical:**
+- Lookup task in tasks.json
+- Verify environment/worktree still exists
+- Change to task directory before launching Claude
+- Pass `/resume` flag to Claude Code for chat continuation
+
 ### Phase 1.33 - Environment Preparation Hooks
 **Goal:** Automated post-clone environment setup
 
@@ -281,7 +297,7 @@ Remove a task's worktree and optionally delete its branch.
 
 ### Future Phases (Backlog/Unplanned)
 - [ ] Branch name inference (`new "add dark mode"` → `mc-add-dark-mode`)
-- [ ] CLI for configuring config.json
+- [ ] `config` command - Get/set configuration values like git config (e.g., `multiclaude config environment_strategy worktree`)
 - [ ] Task dependencies/sequencing
 - [ ] MCP integrations
 - [ ] Remote execution
