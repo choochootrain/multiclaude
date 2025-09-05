@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .errors import MultiClaudeError
-from .git_utils import get_environment_base_dir, get_repo_name, ref_exists
+from .git_utils import configure_clone_remotes, get_environment_base_dir, get_repo_name, ref_exists
 
 
 class EnvironmentStrategy(Protocol):
@@ -98,9 +98,9 @@ class CloneStrategy(EnvironmentStrategy):
         if not ref_exists(repo_root, base_ref):
             raise MultiClaudeError(f"Base ref '{base_ref}' does not exist")
 
-        # Clone the repository
+        # Clone the repository with renamed remote
         result = subprocess.run(
-            ["git", "clone", str(repo_root), str(clone_path)],
+            ["git", "clone", "-o", "local", str(repo_root), str(clone_path), "--no-checkout"],
             capture_output=True,
             text=True,
             check=False,
@@ -108,7 +108,7 @@ class CloneStrategy(EnvironmentStrategy):
         if result.returncode != 0:
             raise MultiClaudeError(f"Failed to clone repository: {result.stderr}")
 
-        # Checkout the base ref first
+        # Checkout the base ref in the clone (safe, doesn't touch base repo)
         result = subprocess.run(
             ["git", "checkout", base_ref],
             capture_output=True,
@@ -118,6 +118,9 @@ class CloneStrategy(EnvironmentStrategy):
         )
         if result.returncode != 0:
             raise MultiClaudeError(f"Failed to checkout base ref '{base_ref}': {result.stderr}")
+
+        # Configure remotes (add origin from base repo, set push.autoSetupRemote)
+        configure_clone_remotes(clone_path, repo_root)
 
         # Create and checkout the new branch from the base ref
         result = subprocess.run(

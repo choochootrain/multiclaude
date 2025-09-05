@@ -209,7 +209,37 @@ Remove a task's worktree and optionally delete its branch.
 - Clone strategy: checkout base ref before creating new branch
 - Add validation to ensure base ref exists in repository
 
-### Phase 1.25 - Swappable Environment Creation Strategy (WIP)
+### Phase 1.24 - Clone Strategy Remote Configuration (COMPLETED)
+**Goal:** Fix remote configuration in clone strategy for intuitive git push behavior
+
+**Features:**
+- [x] Clone with renamed remote (`git clone -o local`) to avoid renaming step
+- [x] Detect and copy origin remote from base repo to clone
+- [x] Set `push.autoSetupRemote = true` for automatic upstream configuration
+- [x] Ensure base repo is never modified (safe for dirty state)
+
+**Technical:**
+- Use `git clone -o local` to name base repo remote as "local"
+- Get origin URL from base repo: `git remote get-url origin`
+- Add origin to clone: `git remote add origin <url>`
+- Configure: `git config push.autoSetupRemote true`
+- Provider-agnostic (works with any git hosting service)
+
+### Phase 1.3 - Shell Directory Persistence (TODO)
+**Goal:** Keep user in task directory after Claude exits
+
+**Features:**
+- [ ] Launch new shell in task directory with Claude
+- [ ] User remains in task directory after Claude exits  
+- [ ] Use exec to replace process cleanly
+
+**Technical:**
+- Get user's shell from `$SHELL` environment variable (default to `/bin/bash`)
+- Launch: `$SHELL -c 'cd <path> && claude && exec $SHELL'`
+- This creates subshell that persists after Claude exits
+- Alternative: Add `--print-command` flag for eval usage
+
+### Phase 1.25 - Swappable Environment Creation Strategy
 **Goal:** Refactor to support multiple git strategies with easy switching
 
 **Features:**
@@ -312,6 +342,7 @@ Remove a task's worktree and optionally delete its branch.
 - [ ] Auto-cleanup after merge
 
 ### Future Phases (Backlog/Unplanned)
+- [ ] Worktree strategy parity - Add `push.autoSetupRemote` config and ensure all branches are available (like clone strategy)
 - [ ] Branch name inference (`new "add dark mode"` → `mc-add-dark-mode`)
 - [ ] `config` command - Get/set configuration values like git config (e.g., `multiclaude config environment_strategy worktree`)
 - [ ] Task dependencies/sequencing
