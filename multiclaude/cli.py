@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import MultiClaudeError, NotInitializedError
-from .git_utils import branch_exists, is_git_repo
+from .git_utils import branch_exists, is_git_repo, ref_exists
 from .strategies import get_strategy
 
 
@@ -183,10 +183,17 @@ def cmd_new(args: argparse.Namespace) -> None:
         print(f"Error: Branch '{branch_name}' already exists.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Creating new isolated environment for '{branch_name}' using strategy: {strategy.name}")
+    # Validate base ref exists
+    if not ref_exists(repo_root, args.base):
+        print(f"Error: Base ref '{args.base}' does not exist.", file=sys.stderr)
+        sys.exit(1)
+
+    print(
+        f"Creating new isolated environment for '{branch_name}' from '{args.base}' using strategy: {strategy.name}"
+    )
 
     try:
-        environment_path = strategy.create(repo_root, branch_name)
+        environment_path = strategy.create(repo_root, branch_name, base_ref=args.base)
     except MultiClaudeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -295,6 +302,11 @@ def main() -> None:
         "branch_name", help="Branch name for the task (mc- prefix added automatically)"
     )
     parser_new.add_argument("--no-launch", action="store_true", help="Don't launch Claude Code")
+    parser_new.add_argument(
+        "--base",
+        default="main",
+        help="Base branch/commit/tag to branch from (default: main)",
+    )
     parser_new.set_defaults(func=cmd_new)
 
     # list command

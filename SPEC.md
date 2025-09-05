@@ -193,6 +193,22 @@ Remove a task's worktree and optionally delete its branch.
 - Direct git CLI integration
 - Basic error handling
 
+### Phase 1.1 - Base Branch Selection (COMPLETED)
+**Goal:** Allow tasks to branch from any ref (branch/commit/tag) instead of always from main
+
+**Features:**
+- [x] Add `--base` flag to `multiclaude new` command
+- [x] Default to "main" branch if flag not specified
+- [x] Support branching from any branch, tag, or commit SHA
+- [x] Validate that base ref exists before creating environment
+- [x] Update both worktree and clone strategies to support base branch
+
+**Technical:**
+- Add optional base_ref parameter to strategy create() methods
+- Worktree strategy: use `git worktree add <path> -b <new-branch> <base-ref>`
+- Clone strategy: checkout base ref before creating new branch
+- Add validation to ensure base ref exists in repository
+
 ### Phase 1.25 - Swappable Environment Creation Strategy (WIP)
 **Goal:** Refactor to support multiple git strategies with easy switching
 

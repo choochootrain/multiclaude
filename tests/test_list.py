@@ -34,7 +34,7 @@ def test_list_single_task(isolated_repo, capsys):
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
     
-    args_new = SimpleNamespace(branch_name="feature-one", no_launch=True)
+    args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main")
     multiclaude.cmd_new(args_new)
     
     # List tasks
@@ -56,7 +56,7 @@ def test_list_multiple_tasks(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
     
     for name in ["feature-one", "feature-two", "bugfix"]:
-        args_new = SimpleNamespace(branch_name=name, no_launch=True)
+        args_new = SimpleNamespace(branch_name=name, no_launch=True, base="main")
         multiclaude.cmd_new(args_new)
     
     # List tasks
@@ -81,7 +81,7 @@ def test_list_detects_missing_worktree(isolated_repo, capsys):
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
     
-    args_new = SimpleNamespace(branch_name="feature", no_launch=True)
+    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main")
     multiclaude.cmd_new(args_new)
     
     # Manually delete the environment directory (simulate external deletion)

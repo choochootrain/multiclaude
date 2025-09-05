@@ -18,7 +18,7 @@ def test_new_creates_task(isolated_repo):
     multiclaude.cmd_init(args_init)
 
     # Create new task
-    args_new = SimpleNamespace(branch_name="test-feature", no_launch=True)
+    args_new = SimpleNamespace(branch_name="test-feature", no_launch=True, base="main")
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
@@ -58,7 +58,7 @@ def test_new_fails_duplicate_branch(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create first task
-    args_new = SimpleNamespace(branch_name="feature", no_launch=True)
+    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main")
     multiclaude.cmd_new(args_new)
 
     # Try to create same task again
@@ -81,7 +81,7 @@ def test_new_no_launch_flag(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create task with --no-launch
-    args_new = SimpleNamespace(branch_name="test", no_launch=True)
+    args_new = SimpleNamespace(branch_name="test", no_launch=True, base="main")
     multiclaude.cmd_new(args_new)
 
     # Check output shows it didn't launch
@@ -99,10 +99,83 @@ def test_new_would_launch_claude(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create task without --no-launch (this will launch claude, but mocked)
-    args_new = SimpleNamespace(branch_name="test", no_launch=False)
+    args_new = SimpleNamespace(branch_name="test", no_launch=False, base="main")
     multiclaude.cmd_new(args_new)
 
     # Check output shows it tried to launch
     captured = capsys.readouterr()
     assert "Launching Claude Code" in captured.out
     assert "Created isolated environment" in captured.out
+
+
+def test_new_with_custom_base_branch(isolated_repo):
+    """Test creating task from a different base branch."""
+    repo_path = isolated_repo
+
+    # Initialize first
+    args_init = SimpleNamespace()
+    multiclaude.cmd_init(args_init)
+
+    # Create a base branch first
+    subprocess.run(["git", "checkout", "-b", "develop"], cwd=repo_path, check=True)
+    subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
+
+    # Create new task from develop branch
+    args_new = SimpleNamespace(branch_name="feature-from-develop", no_launch=True, base="develop")
+    multiclaude.cmd_new(args_new)
+
+    # Check environment was created
+    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
+    expected_environment = Path(environment_dir) / repo_path.name / "mc-feature-from-develop"
+    assert expected_environment.exists()
+
+    # Verify the branch was created from develop by checking git history
+    env_branch_result = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=expected_environment,
+        capture_output=True,
+        text=True,
+    )
+    assert env_branch_result.stdout.strip() == "mc-feature-from-develop"
+    
+    # Check that the branch was created from develop by verifying the merge-base
+    # The merge-base shows the common ancestor commit
+    merge_base_result = subprocess.run(
+        ["git", "merge-base", "mc-feature-from-develop", "develop"],
+        cwd=expected_environment,
+        capture_output=True,
+        text=True,
+    )
+    merge_base_commit = merge_base_result.stdout.strip()
+    
+    # Get the commit hash of develop branch
+    develop_result = subprocess.run(
+        ["git", "rev-parse", "develop"],
+        cwd=expected_environment,
+        capture_output=True,
+        text=True,
+    )
+    develop_commit = develop_result.stdout.strip()
+    
+    # Verify they match (merge-base should be develop itself since we branched from it)
+    assert merge_base_commit == develop_commit, f"Branch not created from develop. Merge-base: {merge_base_commit}, Develop: {develop_commit}"
+
+
+def test_new_with_invalid_base_ref(isolated_repo, capsys):
+    """Test that new command fails when base ref doesn't exist."""
+    repo_path = isolated_repo
+
+    # Initialize first
+    args_init = SimpleNamespace()
+    multiclaude.cmd_init(args_init)
+
+    # Try to create task from non-existent branch
+    args_new = SimpleNamespace(branch_name="test", no_launch=True, base="nonexistent-branch")
+    try:
+        multiclaude.cmd_new(args_new)
+        assert False, "Should have exited"
+    except SystemExit as e:
+        assert e.code == 1
+
+    captured = capsys.readouterr()
+    assert "does not exist" in captured.err

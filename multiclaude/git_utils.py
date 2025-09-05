@@ -32,3 +32,15 @@ def branch_exists(repo_root: Path, branch_name: str) -> bool:
         cwd=repo_root,
     )
     return bool(result.stdout.strip())
+
+
+def ref_exists(repo_root: Path, ref: str) -> bool:
+    """Check if a git ref (branch/tag/commit) exists."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", ref],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+    return result.returncode == 0
