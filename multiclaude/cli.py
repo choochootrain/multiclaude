@@ -2,6 +2,7 @@
 """Multiclaude - CLI tool for managing parallel Claude Code instances with git worktrees."""
 
 import argparse
+import importlib.metadata
 import json
 import os
 import subprocess
@@ -50,7 +51,7 @@ class MultiClaudeConfig:
         self.config_dir.mkdir(exist_ok=True)
 
         config = {
-            "version": "1.0.0",
+            "version": get_version(),
             "repo_root": str(self.repo_root),
             "default_branch": self._get_default_branch(),
             "created_at": datetime.now().isoformat(),
@@ -268,11 +269,20 @@ def cmd_list(args: argparse.Namespace) -> None:
             print(f"  - {task.branch}: branch {task.branch} (pruned {age_str})")
 
 
+def get_version() -> str:
+    """Get the version of multiclaude."""
+    try:
+        return importlib.metadata.version("multiclaude")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Multiclaude - Manage parallel Claude Code instances with isolated environments"
     )
+    parser.add_argument("--version", action="version", version=f"multiclaude {get_version()}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # init command
