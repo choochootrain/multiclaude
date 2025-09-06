@@ -1,6 +1,6 @@
 # Multiclaude
 
-CLI tool for managing parallel Claude Code instances using isolated environments. Work on multiple tasks concurrently without conflicts.
+Manage parallel Claude Code instances with isolated git environments. Each task gets its own complete git clone, allowing you to work on multiple features simultaneously without conflicts.
 
 ## Installation
 
@@ -43,56 +43,37 @@ chmod +x multiclaude.py
 ./multiclaude.py --help
 ```
 
-## Usage
+## Commands
 
-### Initialize in a repository
+### `multiclaude init`
+Initialize multiclaude in the current git repository.
+- Validates current directory is a git repository
+- Creates `.multiclaude/` directory structure
+- Initializes metadata files
+- Adds `.multiclaude` to `.git/info/exclude`
 
-```bash
-cd your-repo
-multiclaude init
-```
+### `multiclaude new <branch-name>`
+Create new Claude task with isolated git environment and launch Claude Code.
 
-This creates a `.multiclaude/` directory to track tasks and adds it to `.git/info/exclude`.
+**Options:**
+- `--no-launch` - Create environment without launching Claude
+- `--base <ref>` - Branch from specific branch/tag/commit (default: main)
 
-### Create a new task
+Creates branch `mc-<branch-name>` and isolated environment in `~/multiclaude-environments/<repo-name>/mc-<branch-name>/`
 
-```bash
-# Create isolated environment and launch Claude Code
-multiclaude new feature-xyz
+### `multiclaude list`
+List all multiclaude-managed tasks with creation times and status.
 
-# Create isolated environment without launching Claude
-multiclaude new bugfix-123 --no-launch
-```
-
-This will:
-1. Create a new branch `mc-feature-xyz`
-2. Set up an isolated environment at `~/multiclaude-environments/<repo-name>/mc-feature-xyz/`
-3. Launch Claude Code in the environment directory
-4. You can then provide task details directly to Claude
-
-### List tasks
-
-```bash
-# Show active tasks
-multiclaude list
-
-# Include pruned tasks
-multiclaude list --show-pruned
-```
-
-Example output:
-```
-Active multiclaude tasks:
-  - mc-dark-mode: branch mc-dark-mode (created 2h ago)
-  - mc-auth-fix: branch mc-auth-fix (created 30m ago)
-```
+### `multiclaude prune [<task-name>]` (planned)
+Clean up task environments and branches (future feature).
 
 ## How It Works
 
-1. Each task gets its own isolated environment - a working directory with its own branch
-2. Claude Code runs in the isolated environment, allowing parallel development without conflicts
-3. Environments are stored outside the main repository to avoid nesting issues
-4. Task metadata is tracked in `.multiclaude/tasks.json`
+1. **Isolated Environments**: Each task gets a complete git clone in `~/multiclaude-environments/`
+2. **Automatic Branching**: Creates branch `mc-<task-name>` from your specified base
+3. **Remote Configuration**: Properly configures git remotes so `git push` works intuitively  
+4. **Claude Integration**: Automatically launches Claude Code in the task environment
+5. **Metadata Tracking**: Tracks tasks in `.multiclaude/tasks.json` for easy management
 
 ## Directory Structure
 
@@ -105,8 +86,8 @@ your-repo/
 
 ~/multiclaude-environments/    # Environments location
 └── your-repo/
-    ├── mc-feature-1/
-    └── mc-feature-2/
+    ├── mc-feature-1/          # Complete git clone
+    └── mc-feature-2/          # Complete git clone
 ```
 
 ## Workflow Example
@@ -189,12 +170,4 @@ ruff check multiclaude/
 mypy multiclaude/
 ```
 
-## Roadmap
-
-- Phase 1 (Current): Basic init, new, list commands
-- Phase 2: Task status tracking and notifications  
-- Phase 3: PR creation and review tools
-- Phase 4: Environment setup automation
-- Phase 5: Cleanup and lifecycle management
-
-See [SPEC.md](SPEC.md) for detailed specifications.
+See [SPEC.md](SPEC.md) for planned features and roadmap.

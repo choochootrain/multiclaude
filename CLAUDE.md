@@ -1,53 +1,19 @@
 # Multiclaude
 
-CLI tool for managing parallel Claude Code instances using isolated environments. Each task gets its own isolated working directory and branch (prefixed with `mc-`).
+CLI tool for managing parallel Claude Code instances using isolated git environments. Each task gets its own complete git clone with proper remote configuration.
 
-## Key Files
-- `multiclaude/cli.py` - Main CLI implementation (init, new, list commands)
-- `.multiclaude/tasks.json` - Tracks active tasks (created by init)
-- Environments stored in `~/multiclaude-environments/<repo-name>/mc-<branch>/`
 
-## Usage
+See [SPEC.md](SPEC.md) for planned features to work on.
+See [README.md](README.md) for overview and usage.
 
-```bash
-# Initialize in a repo
-multiclaude init
+## Key Development Notes
 
-# Create new task (launches Claude in isolated environment)
-multiclaude new feature-xyz
-multiclaude new bugfix --no-launch  # without launching Claude
+- Use `pytest` for testing, `ruff` for linting/formatting
+- Test with sandbox: `sandbox-admin reset` then `mc-sandbox new test`
+- Clone strategy is default (creates full git clones vs worktrees)
+- Tasks tracked in `.multiclaude/tasks.json`, branches use `mc-` prefix
 
-# List tasks
-multiclaude list
-```
-
-## Testing
-
-```bash
-# Run tests
-pytest
-
-# Use sandbox for manual testing
-sandbox-admin reset  # Create fresh sandbox
-mc-sandbox new test  # Run multiclaude in sandbox
-```
-
-Sandbox location: `repos/sandbox/main/` (repo), `repos/sandbox/worktrees/` (environments)
-
-## Code Quality
-
-When completing tasks, always run linting and formatting:
-
-```bash
-# Check and fix linting issues
-ruff check --fix multiclaude/
-
-# Format code consistently  
-ruff format multiclaude/
-
-# Run tests to ensure nothing broke
-pytest
-```
-
-## Environment Variables
-- `MULTICLAUDE_ENVIRONMENT_DIR` - Override default environment location (used in tests and sandbox)
+### Development Workflow
+1. Write tests for new features first
+2. Test with sandbox for manual verification
+3. Run `pytest`, `ruff check --fix`, `ruff format` before commits
