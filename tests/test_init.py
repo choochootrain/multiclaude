@@ -1,7 +1,6 @@
 """Tests for multiclaude init command."""
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude

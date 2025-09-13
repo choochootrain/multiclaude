@@ -193,7 +193,7 @@ def cmd_new(args: argparse.Namespace) -> None:
     )
 
     try:
-        environment_path = strategy.create(repo_root, branch_name, base_ref=args.base)
+        environment_path, was_reused = strategy.create(repo_root, branch_name, base_ref=args.base)
     except MultiClaudeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -209,7 +209,10 @@ def cmd_new(args: argparse.Namespace) -> None:
     task_mgr = TaskManager(repo_root)
     task_mgr.add_task(task)
 
-    print(f"✓ Created isolated environment for branch '{branch_name}' at {environment_path}")
+    if was_reused:
+        print(f"✓ Reused existing environment for branch '{branch_name}' at {environment_path}")
+    else:
+        print(f"✓ Created new environment for branch '{branch_name}' at {environment_path}")
 
     if not args.no_launch:
         print(f"Launching Claude Code in {environment_path}...")
@@ -301,7 +304,9 @@ def main() -> None:
     parser_new.add_argument(
         "branch_name", help="Branch name for the task (mc- prefix added automatically)"
     )
-    parser_new.add_argument("--no-launch", action="store_true", help="Don't launch Claude Code")
+    parser_new.add_argument(
+        "--no-launch", "-n", action="store_true", help="Don't launch Claude Code"
+    )
     parser_new.add_argument(
         "--base",
         default="main",

@@ -17,3 +17,8 @@ See [README.md](README.md) for overview and usage.
 1. Write tests for new features first
 2. Test with sandbox for manual verification
 3. Run `pytest`, `ruff check --fix`, `ruff format` before commits
+
+## Error Handling
+- NEVER fail silently - always print warnings or errors when operations fail
+- If an operation can't complete as expected, inform the user with clear messages
+- When falling back to alternative behavior, explain what happened and why

@@ -4,8 +4,32 @@ See [README.md](README.md) for overview and usage.
 
 ## Phase Plan
 
-### Phase 1.35 - Prune Command (TODO)
-**Goal:** Clean up task environments intelligently with environment recycling for efficiency
+### Phase 1.35 - Environment Recycling (COMPLETE)
+**Goal:** Reuse existing clone environments to save time and disk space
+
+**Features:**
+- [x] Automatic recycling: When removing tasks, rename environments to `avail-{hash}` for reuse
+- [x] Smart reuse: Check for available environments before creating new clones
+- [x] Quick exploration: Add `-n` short flag for `--no-launch` to explore without Claude
+- [x] Clear messaging: Show whether environment was reused or newly created
+
+**Technical:**
+- Available environments use naming pattern: `avail-{hash}` (e.g., `avail-a3f2b9`)
+- Prefix `avail-` prevents collision with user-created branches like `mc new abc123`
+- When creating new task with clone strategy:
+  - Scan environment directory for `avail-{hash}` pattern
+  - If found: rename to task name, reset to base ref, create new branch
+  - If not: clone as usual
+  - Returns tuple indicating whether environment was reused
+- When removing task (clone strategy):
+  - Generate short hash (6-8 alphanumeric chars)
+  - Rename environment to `avail-{hash}` instead of deleting
+  - Clean git state (remove uncommitted changes, reset to default branch)
+- No tracking file needed - directory scan is sufficient
+- Benefits: Saves clone time on large repos, reduces disk I/O
+
+### Phase 1.36 - Prune Command (TODO)
+**Goal:** Clean up task environments intelligently
 
 **Features:**
 - [ ] Smart detection: auto-prune if branch merged to default branch
@@ -13,7 +37,6 @@ See [README.md](README.md) for overview and usage.
 - [ ] Selective pruning: `prune <task-name>` to prune specific task
 - [ ] Force mode: `prune <task> --force` to prune regardless of safety checks
 - [ ] Dry run: `--dry-run` shows what would happen without making changes
-- [ ] Environment recycling: Rename pruned environments to `available-{uuid}` for reuse
 
 **Command Usage:**
 ```bash
@@ -23,22 +46,14 @@ multiclaude prune <task> --force  # Force prune (skip safety checks)
 multiclaude prune --dry-run    # Show what would be pruned
 ```
 
-**Technical - Pruning:**
+**Technical:**
 - Check merge status: `git branch --merged <default-branch>`
 - Check for uncommitted changes: `git status --porcelain`
 - Check for unpushed commits: `git log origin/<branch>..HEAD`
 - Skip environments with uncommitted/unpushed changes (unless --force)
-- For clone strategy: Rename environment to `available-{uuid}` instead of deleting
+- For clone strategy: Convert to available environment (`avail-{hash}`)
 - For worktree strategy: Remove worktree (can't recycle)
-- Update tasks.json to remove pruned entries
-
-**Technical - Environment Recycling (Clone Strategy):**
-- Pruned environments renamed to `available-{uuid}`
-- Track available environments in `.multiclaude/available.json`
-- When creating new task, check for available environment first
-- If found: rename, reset to base ref, create new branch
-- If not: clone as usual
-- Benefits: Saves time on large repos, preserves environment setup
+- Update tasks.json to mark entries as pruned
 
 **Safety:**
 - Check for uncommitted and unpushed changes
