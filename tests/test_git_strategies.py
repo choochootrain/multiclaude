@@ -104,7 +104,10 @@ module.exports = { add };
 
 
 def create_worktree(
-    repo_path: Path, branch_name: str, worktree_name: str = None, create_new_branch: bool = True
+    repo_path: Path,
+    branch_name: str,
+    worktree_name: str | None = None,
+    create_new_branch: bool = True,
 ) -> Path:
     """Helper to create a worktree."""
     if worktree_name is None:
@@ -123,7 +126,7 @@ def create_worktree(
 def measure_disk_usage(path: Path) -> int:
     """Measure disk usage of a directory in bytes."""
     total = 0
-    for dirpath, dirnames, filenames in os.walk(path):
+    for dirpath, _dirnames, filenames in os.walk(path):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             if os.path.islink(fp):
@@ -236,7 +239,7 @@ def test_worktree_temporary_branch_swap(repo_with_deps):
     make_test_changes(worktree_path)
 
     # Get the commit hash from worktree
-    worktree_commit = subprocess.run(
+    subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=worktree_path, capture_output=True, text=True, check=True
     ).stdout.strip()
 
@@ -277,7 +280,7 @@ def test_worktree_patch_based_swap(repo_with_deps):
     make_test_changes(worktree_path)
 
     # Record main repo's current branch
-    original_branch = subprocess.run(
+    subprocess.run(
         ["git", "branch", "--show-current"],
         cwd=repo_path,
         capture_output=True,

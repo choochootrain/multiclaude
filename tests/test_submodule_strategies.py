@@ -149,7 +149,10 @@ echo "All tests passed!"
 
 
 def create_worktree(
-    repo_path: Path, branch_name: str, worktree_name: str = None, create_new_branch: bool = True
+    repo_path: Path,
+    branch_name: str,
+    worktree_name: str | None = None,
+    create_new_branch: bool = True,
 ) -> Path:
     """Helper to create a worktree."""
     if worktree_name is None:
@@ -237,7 +240,9 @@ export {{ main }};
     )
 
 
-def verify_submodule_state(repo_path: Path, submodule_path: str, expected_branch: str = None):
+def verify_submodule_state(
+    repo_path: Path, submodule_path: str, expected_branch: str | None = None
+):
     """Verify submodule is in correct state."""
     submodule_full_path = repo_path / submodule_path
 

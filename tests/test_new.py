@@ -51,8 +51,6 @@ def test_new_creates_task(isolated_repo):
 
 def test_new_fails_duplicate_branch(isolated_repo, capsys):
     """Test that new command fails when branch already exists."""
-    repo_path = isolated_repo
-
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -74,8 +72,6 @@ def test_new_fails_duplicate_branch(isolated_repo, capsys):
 
 def test_new_no_launch_flag(isolated_repo, capsys):
     """Test that --no-launch flag prevents claude from being launched."""
-    repo_path = isolated_repo
-
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -93,8 +89,6 @@ def test_new_no_launch_flag(isolated_repo, capsys):
 
 def test_new_short_n_flag(isolated_repo, capsys):
     """Test that -n short flag works the same as --no-launch."""
-    repo_path = isolated_repo
-
     # Initialize multiclaude
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -111,8 +105,6 @@ def test_new_short_n_flag(isolated_repo, capsys):
 
 def test_new_would_launch_claude(isolated_repo, capsys):
     """Test that without --no-launch, claude would be launched."""
-    repo_path = isolated_repo
-
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -194,8 +186,6 @@ def test_new_with_custom_base_branch(isolated_repo):
 
 def test_new_with_invalid_base_ref(isolated_repo, capsys):
     """Test that new command fails when base ref doesn't exist."""
-    repo_path = isolated_repo
-
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -353,16 +343,15 @@ def test_new_reuses_available_environment(isolated_repo, capsys):
 
     # Manually remove the task to create an available environment
     # (since there's no remove command yet, we use the strategy directly)
-    from multiclaude.strategies import CloneStrategy
     from multiclaude.git_utils import get_environment_base_dir
+    from multiclaude.strategies import CloneStrategy
+
     strategy = CloneStrategy(get_environment_base_dir())
     strategy.remove(task1_path)
 
     # Verify available environment was created
     repo_dir = Path(environment_dir) / repo_path.name
-    available_envs = [
-        p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")
-    ]
+    available_envs = [p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")]
     assert len(available_envs) == 1
 
     # Create second task - should reuse the available environment

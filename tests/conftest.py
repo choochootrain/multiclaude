@@ -96,13 +96,12 @@ def mock_claude(monkeypatch) -> MagicMock:
     original_run = subprocess.run
 
     def track_claude_run(cmd, *args, **kwargs):
-        if isinstance(cmd, list):
+        if isinstance(cmd, list) and "claude" in str(cmd):
             # Track claude launches
-            if "claude" in str(cmd):
-                mock(cmd, *args, **kwargs)
-                result = MagicMock()
-                result.returncode = 0
-                return result
+            mock(cmd, *args, **kwargs)
+            result = MagicMock()
+            result.returncode = 0
+            return result
         return original_run(cmd, *args, **kwargs)
 
     monkeypatch.setattr("subprocess.run", track_claude_run)

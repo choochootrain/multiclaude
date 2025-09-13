@@ -11,8 +11,6 @@ from multiclaude import cli as multiclaude
 
 def test_list_empty(isolated_repo, capsys):
     """Test list command when no tasks exist."""
-    repo_path = isolated_repo
-
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -27,8 +25,6 @@ def test_list_empty(isolated_repo, capsys):
 
 def test_list_single_task(isolated_repo, capsys):
     """Test list command with one task."""
-    repo_path = isolated_repo
-
     # Initialize and create one task
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
@@ -48,8 +44,6 @@ def test_list_single_task(isolated_repo, capsys):
 
 def test_list_multiple_tasks(isolated_repo, capsys):
     """Test list command with multiple tasks."""
-    repo_path = isolated_repo
-
     # Initialize and create multiple tasks
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)

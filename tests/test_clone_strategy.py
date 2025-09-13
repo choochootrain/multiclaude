@@ -78,9 +78,7 @@ def test_clone_strategy_reuses_available_environment(isolated_repo, tmp_path):
     # Check that an available environment was created
     repo_name = repo_path.name
     repo_dir = tmp_path / repo_name
-    available_envs = [
-        p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")
-    ]
+    available_envs = [p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")]
     assert len(available_envs) == 1
 
     # Create second task (should reuse available environment)
@@ -110,7 +108,7 @@ def test_clone_strategy_remove_creates_available_environment(isolated_repo, tmp_
     # Make some changes in the environment to test cleanup
     test_file = task_path / "test.txt"
     test_file.write_text("uncommitted changes")
-    
+
     # Create a different branch to test reset
     subprocess.run(
         ["git", "checkout", "-b", "feature-branch"],
@@ -127,9 +125,7 @@ def test_clone_strategy_remove_creates_available_environment(isolated_repo, tmp_
     # Available environment should exist
     repo_name = repo_path.name
     repo_dir = tmp_path / repo_name
-    available_envs = [
-        p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")
-    ]
+    available_envs = [p for p in repo_dir.iterdir() if p.is_dir() and p.name.startswith("avail-")]
     assert len(available_envs) == 1
 
     # The available environment should be clean (no uncommitted changes)
@@ -145,7 +141,7 @@ def test_clone_strategy_remove_creates_available_environment(isolated_repo, tmp_
         check=True,
     )
     assert result.stdout.strip() in ["main", "master"]
-    
+
     # Should have no uncommitted changes
     status_result = subprocess.run(
         ["git", "status", "--porcelain"],
