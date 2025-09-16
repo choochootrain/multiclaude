@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import configure_git_repo
 
 @pytest.fixture
 def repo_with_submodules(isolated_repo):
@@ -20,6 +21,7 @@ def repo_with_submodules(isolated_repo):
     lib_repo = base_dir / "shared-lib"
     lib_repo.mkdir()
     subprocess.run(["git", "init"], cwd=lib_repo, check=True, capture_output=True)
+    configure_git_repo(lib_repo)
 
     # Add content to library repo
     lib_src = lib_repo / "src"
@@ -200,6 +202,7 @@ export function newFunction_{random_suffix}() {{
 
     # Commit submodule changes
     subprocess.run(["git", "add", "."], cwd=submodule_full_path, check=True)
+    configure_git_repo(submodule_full_path)
     subprocess.run(
         ["git", "commit", "-m", f"Update library for {branch_name} - {random_suffix}"],
         cwd=submodule_full_path,
@@ -207,6 +210,7 @@ export function newFunction_{random_suffix}() {{
     )
 
     # Update main repo to reference new submodule commit
+    configure_git_repo(repo_path)
     subprocess.run(["git", "add", submodule_path], cwd=repo_path, check=True)
     subprocess.run(
         ["git", "commit", "-m", f"Update submodule to {branch_name} version"],
@@ -233,6 +237,7 @@ export {{ main }};
 """)
 
     subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+    configure_git_repo(repo_path)
     subprocess.run(
         ["git", "commit", "-m", f"Update main app for {branch_name} - {random_suffix}"],
         cwd=repo_path,
@@ -418,14 +423,15 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
             check=True,
         )
 
-    # 3. Apply submodule patches first
-    submodule_patch_files = list(submodule_patches_dir.glob("*.patch"))
-    if submodule_patch_files:
-        main_submodule = main_repo / "libs/shared-lib"
-        for patch_file in sorted(submodule_patch_files):
-            subprocess.run(
-                ["git", "am", str(patch_file)], cwd=main_submodule, capture_output=True, check=True
-            )
+        # 3. Apply submodule patches first
+        submodule_patch_files = list(submodule_patches_dir.glob("*.patch"))
+        if submodule_patch_files:
+            main_submodule = main_repo / "libs/shared-lib"
+            configure_git_repo(main_submodule)
+            for patch_file in sorted(submodule_patch_files):
+                subprocess.run(
+                    ["git", "am", str(patch_file)], cwd=main_submodule, capture_output=True, check=True
+                )
 
     # 4. Apply main repo patches (these will update submodule references)
     main_patch_files = [f for f in patches_dir.glob("*.patch") if f.parent == patches_dir]

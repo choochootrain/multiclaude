@@ -61,6 +61,29 @@ multiclaude prune --dry-run    # Show what would be pruned
 - --force flag overrides all safety checks
 - Confirm before destructive operations (unless --yes flag)
 
+### Phase 1.37 - Multi-Agent Launch (COMPLETE)
+**Goal:** Allow launching environments with agents other than Claude Code while keeping Claude as the default.
+
+**Features:**
+- [x] `multiclaude new ... --agent/-a <name>` to choose agent per task
+- [x] Persist selected agent in `.multiclaude/tasks.json`
+- [x] Surface agent information in `multiclaude list`
+- [x] Optional repository-level default agent via `.multiclaude/config.json`
+
+**Technical:**
+- Treat agent name as the executable/command to invoke for launch
+- On `init`, write `default_agent` (default `claude`) and migrate existing configs
+- Extend `Task` schema to include `agent`
+- Validate requested agent, ensure executable exists before environment creation
+- Launch the selected agent process instead of hardcoded Claude command
+- Ensure `--no-launch` skips agent invocation uniformly
+
+**Safety & UX:**
+- Invalid agent values (empty strings, whitespace) trigger clear CLI errors with guidance
+- Missing executables warn users and exit without partial setup
+- Document expected usage and agent configuration in `README.md` and `AGENTS.md`
+- Add pytest coverage for agent flag parsing, config migration, validation, and launch logic
+
 ### Phase 1.44 - Resume Task Command
 **Goal:** Allow users to resume work on existing tasks
 
@@ -174,4 +197,3 @@ multiclaude prune --dry-run    # Show what would be pruned
 - [ ] Session management
 - [ ] Custom Claude flags
 - [ ] Multi-repo improvements
-

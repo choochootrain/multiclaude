@@ -2,9 +2,12 @@
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from multiclaude import cli as multiclaude
 
@@ -18,7 +21,7 @@ def test_new_creates_task(isolated_repo):
     multiclaude.cmd_init(args_init)
 
     # Create new task
-    args_new = SimpleNamespace(branch_name="test-feature", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="test-feature", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
@@ -47,6 +50,7 @@ def test_new_creates_task(isolated_repo):
     assert task["status"] == "active"
     assert task["environment_path"] == str(expected_environment)
     assert "created_at" in task
+    assert task["agent"] == "claude"
 
 
 def test_new_fails_duplicate_branch(isolated_repo, capsys):
@@ -56,7 +60,7 @@ def test_new_fails_duplicate_branch(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create first task
-    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Try to create same task again
@@ -77,12 +81,12 @@ def test_new_no_launch_flag(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create task with --no-launch
-    args_new = SimpleNamespace(branch_name="test", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="test", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Check output shows it didn't launch
     captured = capsys.readouterr()
-    assert "Launching Claude Code" not in captured.out
+    assert "Launching claude" not in captured.out
     # First task should always create new environment
     assert "Created new environment" in captured.out
 
@@ -94,30 +98,87 @@ def test_new_short_n_flag(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create task with -n (simulated as no_launch=True in args)
-    args_new = SimpleNamespace(branch_name="test-short", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="test-short", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     captured = capsys.readouterr()
-    assert "Launching Claude Code" not in captured.out
+    assert "Launching claude" not in captured.out
     # Should create new environment (different branch name from previous test)
     assert "Created new environment" in captured.out
 
 
 def test_new_would_launch_claude(isolated_repo, capsys):
-    """Test that without --no-launch, claude would be launched."""
+    """Test that without --no-launch, the agent is launched."""
     # Initialize first
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
 
     # Create task without --no-launch (this will launch claude, but mocked)
-    args_new = SimpleNamespace(branch_name="test", no_launch=False, base="main")
+    args_new = SimpleNamespace(branch_name="test", no_launch=False, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Check output shows it tried to launch
     captured = capsys.readouterr()
-    assert "Launching Claude Code" in captured.out
+    assert "Launching claude" in captured.out
     # Should create new environment
     assert "Created new environment" in captured.out
+
+
+def test_new_with_custom_agent_flag(isolated_repo, capsys):
+    """Test that specifying a custom agent persists and surfaces correctly."""
+    repo_path = isolated_repo
+
+    args_init = SimpleNamespace()
+    multiclaude.cmd_init(args_init)
+
+    args_new = SimpleNamespace(
+        branch_name="custom-agent-task",
+        no_launch=True,
+        base="main",
+        agent="custom-agent",
+    )
+    multiclaude.cmd_new(args_new)
+
+    captured = capsys.readouterr()
+    assert "agent: custom-agent" in captured.out
+
+    tasks_file = repo_path / ".multiclaude" / "tasks.json"
+    tasks = json.loads(tasks_file.read_text())
+    assert tasks[0]["agent"] == "custom-agent"
+
+
+def test_new_fails_when_agent_missing(isolated_repo, monkeypatch, capsys):
+    """Test that new command fails when the requested agent is unavailable."""
+    repo_path = isolated_repo
+
+    args_init = SimpleNamespace()
+    multiclaude.cmd_init(args_init)
+
+    original_which = shutil.which
+
+    def missing_agent(command: str, *args, **kwargs):
+        if command == "missing-agent":
+            return None
+        return original_which(command, *args, **kwargs)
+
+    monkeypatch.setattr("shutil.which", missing_agent)
+
+    args_new = SimpleNamespace(
+        branch_name="missing-agent-task",
+        no_launch=True,
+        base="main",
+        agent="missing-agent",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        multiclaude.cmd_new(args_new)
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert "Agent 'missing-agent' not found" in captured.err
+
+    tasks_file = repo_path / ".multiclaude" / "tasks.json"
+    assert json.loads(tasks_file.read_text()) == []
 
 
 def test_new_with_custom_base_branch(isolated_repo):
@@ -133,7 +194,9 @@ def test_new_with_custom_base_branch(isolated_repo):
     subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
 
     # Create new task from develop branch
-    args_new = SimpleNamespace(branch_name="feature-from-develop", no_launch=True, base="develop")
+    args_new = SimpleNamespace(
+        branch_name="feature-from-develop", no_launch=True, base="develop", agent=None
+    )
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
@@ -191,7 +254,9 @@ def test_new_with_invalid_base_ref(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Try to create task from non-existent branch
-    args_new = SimpleNamespace(branch_name="test", no_launch=True, base="nonexistent-branch")
+    args_new = SimpleNamespace(
+        branch_name="test", no_launch=True, base="nonexistent-branch", agent=None
+    )
     try:
         multiclaude.cmd_new(args_new)
         assert False, "Should have exited"
@@ -218,7 +283,9 @@ def test_new_with_origin_remote(isolated_repo):
     multiclaude.cmd_init(args_init)
 
     # Create new task
-    args_new = SimpleNamespace(branch_name="test-remotes", no_launch=True, base="main")
+    args_new = SimpleNamespace(
+        branch_name="test-remotes", no_launch=True, base="main", agent=None
+    )
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
@@ -274,7 +341,9 @@ def test_new_without_origin_remote(isolated_repo):
     multiclaude.cmd_init(args_init)
 
     # Create new task
-    args_new = SimpleNamespace(branch_name="test-no-origin", no_launch=True, base="main")
+    args_new = SimpleNamespace(
+        branch_name="test-no-origin", no_launch=True, base="main", agent=None
+    )
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
@@ -330,7 +399,7 @@ def test_new_reuses_available_environment(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     # Create first task
-    args_new1 = SimpleNamespace(branch_name="task1", no_launch=True, base="main")
+    args_new1 = SimpleNamespace(branch_name="task1", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new1)
 
     captured = capsys.readouterr()
@@ -355,7 +424,7 @@ def test_new_reuses_available_environment(isolated_repo, capsys):
     assert len(available_envs) == 1
 
     # Create second task - should reuse the available environment
-    args_new2 = SimpleNamespace(branch_name="task2", no_launch=True, base="main")
+    args_new2 = SimpleNamespace(branch_name="task2", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new2)
 
     captured = capsys.readouterr()

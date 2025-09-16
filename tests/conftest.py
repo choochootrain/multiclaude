@@ -1,12 +1,30 @@
 """Pytest fixtures for multiclaude tests."""
 
 import os
+import shutil
+import subprocess
 import time
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+
+def configure_git_repo(path: Path) -> None:
+    """Configure git user info and disable GPG signing for test repos."""
+    settings = [
+        ("user.name", "Test User"),
+        ("user.email", "test@example.com"),
+        ("commit.gpgsign", "false"),
+    ]
+    for key, value in settings:
+        subprocess.run(
+            ["git", "config", key, value],
+            cwd=path,
+            capture_output=True,
+            check=True,
+        )
 
 
 @pytest.fixture
@@ -24,9 +42,8 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
     repo_path.mkdir(parents=True)
 
     # Initialize git repo
-    import subprocess
-
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
+    configure_git_repo(repo_path)
 
     # Create initial commit
     readme = repo_path / "README.md"
@@ -45,22 +62,27 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
     monkeypatch.chdir(repo_path)
 
     # Mock subprocess.run to handle "which claude" and actual claude launches
+    agent_commands: set[str] = set()
+
+    original_which = shutil.which
+
+    def mock_which(command, *args, **kwargs):
+        if isinstance(command, str) and command.strip():
+            normalized = command.strip()
+            agent_commands.add(normalized)
+            return str(Path("/usr/local/bin") / normalized)
+        return original_which(command, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "which", mock_which)
+
     original_run = subprocess.run
 
     def mock_run(cmd, *args, **kwargs):
         if isinstance(cmd, list):
-            # Mock "which claude" to succeed
-            if cmd == ["which", "claude"]:
+            if cmd and cmd[0] in agent_commands:
                 result = MagicMock()
                 result.returncode = 0
-                result.stdout = "/usr/local/bin/claude"
-                result.stderr = ""
-                return result
-            # Mock actual claude launch
-            elif len(cmd) > 0 and cmd[0] == "claude":
-                result = MagicMock()
-                result.returncode = 0
-                result.stdout = "Claude launched (mocked)"
+                result.stdout = f"{cmd[0]} launched (mocked)"
                 result.stderr = ""
                 return result
         # Let other commands through

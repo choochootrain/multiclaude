@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import configure_git_repo
+
 # Helper fixture for complex repo with dependencies
 
 
@@ -137,6 +139,7 @@ def measure_disk_usage(path: Path) -> int:
 
 def make_test_changes(repo_path: Path, filename: str = "src/index.js"):
     """Make a test change that could conflict with other changes."""
+    configure_git_repo(repo_path)
     # Generate random changes to simulate real conflicts
     random_suffix = "".join(random.choices(string.ascii_letters, k=6))
 

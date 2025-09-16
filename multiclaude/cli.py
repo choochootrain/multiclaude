@@ -5,6 +5,7 @@ import argparse
 import importlib.metadata
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -17,6 +18,9 @@ from .git_utils import branch_exists, is_git_repo, ref_exists
 from .strategies import get_strategy
 
 
+DEFAULT_AGENT = "claude"
+
+
 @dataclass
 class Task:
     """Represents a multiclaude task."""
@@ -26,12 +30,19 @@ class Task:
     created_at: str
     status: str
     environment_path: str
+    agent: str = DEFAULT_AGENT
     pruned_at: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create Task from dictionary."""
-        return cls(**data)
+        normalized = data.copy()
+        agent = normalized.get("agent")
+        if not isinstance(agent, str) or not agent.strip():
+            normalized["agent"] = DEFAULT_AGENT
+        else:
+            normalized["agent"] = agent.strip()
+        return cls(**normalized)
 
 
 class MultiClaudeConfig:
@@ -56,6 +67,7 @@ class MultiClaudeConfig:
             "default_branch": self._get_default_branch(),
             "created_at": datetime.now().isoformat(),
             "environment_strategy": "clone",
+            "default_agent": DEFAULT_AGENT,
         }
 
         self.config_file.write_text(json.dumps(config, indent=2))
@@ -71,7 +83,10 @@ class MultiClaudeConfig:
         """Load configuration."""
         if not self.exists():
             raise NotInitializedError("Multiclaude not initialized. Run 'multiclaude init' first.")
-        return json.loads(self.config_file.read_text())
+        config = json.loads(self.config_file.read_text())
+        if "default_agent" not in config or not isinstance(config["default_agent"], str):
+            config["default_agent"] = DEFAULT_AGENT
+        return config
 
     def _get_default_branch(self) -> str:
         """Get the default branch name."""
@@ -166,15 +181,21 @@ def cmd_new(args: argparse.Namespace) -> None:
     strategy_name = config.get("environment_strategy", "clone")
     strategy = get_strategy(strategy_name)
 
-    # Check if claude is installed
-    claude_check = subprocess.run(
-        ["which", "claude"],
-        capture_output=True,
-        check=False,
-    )
-    if claude_check.returncode != 0:
-        print("Error: Claude Code not found. Please install Claude Code first.", file=sys.stderr)
-        print("Visit: https://claude.ai/download", file=sys.stderr)
+    agent_name = args.agent if args.agent is not None else config.get("default_agent", DEFAULT_AGENT)
+    if not isinstance(agent_name, str) or not agent_name.strip():
+        print(
+            "Error: Agent name cannot be empty. Provide a command with --agent or set default_agent in .multiclaude/config.json.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    agent_name = agent_name.strip()
+
+    agent_path = shutil.which(agent_name)
+    if agent_path is None:
+        print(
+            f"Error: Agent '{agent_name}' not found on PATH. Install it or update --agent/default_agent to a valid command.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     branch_name = f"mc-{args.branch_name}"
@@ -189,7 +210,7 @@ def cmd_new(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     print(
-        f"Creating new isolated environment for '{branch_name}' from '{args.base}' using strategy: {strategy.name}"
+        f"Creating new isolated environment for '{branch_name}' from '{args.base}' using strategy: {strategy.name} (agent: {agent_name})"
     )
 
     try:
@@ -205,6 +226,7 @@ def cmd_new(args: argparse.Namespace) -> None:
         created_at=datetime.now().isoformat(),
         status="active",
         environment_path=str(environment_path),
+        agent=agent_name,
     )
     task_mgr = TaskManager(repo_root)
     task_mgr.add_task(task)
@@ -215,9 +237,9 @@ def cmd_new(args: argparse.Namespace) -> None:
         print(f"✓ Created new environment for branch '{branch_name}' at {environment_path}")
 
     if not args.no_launch:
-        print(f"Launching Claude Code in {environment_path}...")
+        print(f"Launching {agent_name} in {environment_path}...")
         os.chdir(environment_path)
-        subprocess.run(["claude"], check=False)
+        subprocess.run([agent_name], check=False)
     else:
         print(f"To start working, run: cd {environment_path}")
 
@@ -267,7 +289,10 @@ def cmd_list(args: argparse.Namespace) -> None:
                 age_str = f"{age.seconds // 60}m ago"
 
             status = "" if task.status == "active" else f" [{task.status}]"
-            print(f"  - {task.branch}: branch {task.branch} (created {age_str}){status}")
+            agent_info = f" agent={task.agent}" if task.agent else ""
+            print(
+                f"  - {task.branch}: branch {task.branch} (created {age_str}){status}{agent_info}"
+            )
 
     # Display pruned tasks if any
     if pruned_tasks and args.show_pruned:
@@ -276,7 +301,8 @@ def cmd_list(args: argparse.Namespace) -> None:
             pruned = datetime.fromisoformat(task.pruned_at or task.created_at)
             age = datetime.now() - pruned
             age_str = f"{age.days}d ago" if age.days > 0 else f"{age.seconds // 3600}h ago"
-            print(f"  - {task.branch}: branch {task.branch} (pruned {age_str})")
+            agent_info = f" agent={task.agent}" if task.agent else ""
+            print(f"  - {task.branch}: branch {task.branch} (pruned {age_str}){agent_info}")
 
 
 def get_version() -> str:
@@ -305,12 +331,17 @@ def main() -> None:
         "branch_name", help="Branch name for the task (mc- prefix added automatically)"
     )
     parser_new.add_argument(
-        "--no-launch", "-n", action="store_true", help="Don't launch Claude Code"
+        "--no-launch", "-n", action="store_true", help="Don't launch the agent"
     )
     parser_new.add_argument(
         "--base",
         default="main",
         help="Base branch/commit/tag to branch from (default: main)",
+    )
+    parser_new.add_argument(
+        "--agent",
+        "-a",
+        help="Command to launch for this task's agent (defaults to config default_agent)",
     )
     parser_new.set_defaults(func=cmd_new)
 

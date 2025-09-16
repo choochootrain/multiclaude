@@ -29,7 +29,7 @@ def test_list_single_task(isolated_repo, capsys):
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
 
-    args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # List tasks
@@ -40,6 +40,7 @@ def test_list_single_task(isolated_repo, capsys):
     assert "Active multiclaude tasks:" in captured.out
     assert "mc-feature-one" in captured.out
     assert "branch mc-feature-one" in captured.out
+    assert "agent=claude" in captured.out
 
 
 def test_list_multiple_tasks(isolated_repo, capsys):
@@ -49,7 +50,7 @@ def test_list_multiple_tasks(isolated_repo, capsys):
     multiclaude.cmd_init(args_init)
 
     for name in ["feature-one", "feature-two", "bugfix"]:
-        args_new = SimpleNamespace(branch_name=name, no_launch=True, base="main")
+        args_new = SimpleNamespace(branch_name=name, no_launch=True, base="main", agent=None)
         multiclaude.cmd_new(args_new)
 
     # List tasks
@@ -64,6 +65,7 @@ def test_list_multiple_tasks(isolated_repo, capsys):
 
     # Check all have branch info
     assert captured.out.count("branch mc-") == 3
+    assert captured.out.count("agent=claude") == 3
 
 
 def test_list_detects_missing_worktree(isolated_repo, capsys):
@@ -74,7 +76,7 @@ def test_list_detects_missing_worktree(isolated_repo, capsys):
     args_init = SimpleNamespace()
     multiclaude.cmd_init(args_init)
 
-    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main")
+    args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Manually delete the environment directory (simulate external deletion)
