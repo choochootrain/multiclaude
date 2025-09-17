@@ -28,15 +28,16 @@ See [README.md](README.md) for overview and usage.
 - No tracking file needed - directory scan is sufficient
 - Benefits: Saves clone time on large repos, reduces disk I/O
 
-### Phase 1.36 - Prune Command (TODO)
+### Phase 1.36 - Prune Command (COMPLETE)
 **Goal:** Clean up task environments intelligently
 
 **Features:**
-- [ ] Smart detection: auto-prune if branch merged to default branch
-- [ ] Manual cleanup: detect and remove stale tasks.json entries
-- [ ] Selective pruning: `prune <task-name>` to prune specific task
-- [ ] Force mode: `prune <task> --force` to prune regardless of safety checks
-- [ ] Dry run: `--dry-run` shows what would happen without making changes
+- [x] Smart detection: auto-prune if branch merged to default branch
+- [x] Manual cleanup: detect and remove stale tasks.json entries
+- [x] Selective pruning: `prune <task-name>` to prune specific task
+- [x] Force mode: `prune <task> --force` to prune regardless of safety checks
+- [x] Dry run: `--dry-run` shows what would happen without making changes
+- [x] `multiclaude list` hides pruned entries by default with `--show-pruned` flag to reveal them
 
 **Command Usage:**
 ```bash
@@ -44,6 +45,7 @@ multiclaude prune              # Prune all eligible (merged/stale) tasks
 multiclaude prune <task-name>  # Prune specific task if eligible
 multiclaude prune <task> --force  # Force prune (skip safety checks)
 multiclaude prune --dry-run    # Show what would be pruned
+multiclaude prune --yes        # Skip confirmation prompt when pruning
 ```
 
 **Technical:**

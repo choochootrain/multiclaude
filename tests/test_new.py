@@ -283,9 +283,7 @@ def test_new_with_origin_remote(isolated_repo):
     multiclaude.cmd_init(args_init)
 
     # Create new task
-    args_new = SimpleNamespace(
-        branch_name="test-remotes", no_launch=True, base="main", agent=None
-    )
+    args_new = SimpleNamespace(branch_name="test-remotes", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Check environment was created

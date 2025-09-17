@@ -11,6 +11,7 @@ import pytest
 
 from tests.conftest import configure_git_repo
 
+
 @pytest.fixture
 def repo_with_submodules(isolated_repo):
     """Create a repo with submodules for testing advanced git strategies."""
@@ -430,7 +431,10 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
             configure_git_repo(main_submodule)
             for patch_file in sorted(submodule_patch_files):
                 subprocess.run(
-                    ["git", "am", str(patch_file)], cwd=main_submodule, capture_output=True, check=True
+                    ["git", "am", str(patch_file)],
+                    cwd=main_submodule,
+                    capture_output=True,
+                    check=True,
                 )
 
     # 4. Apply main repo patches (these will update submodule references)

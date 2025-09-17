@@ -17,7 +17,6 @@ from .errors import MultiClaudeError, NotInitializedError
 from .git_utils import branch_exists, is_git_repo, ref_exists
 from .strategies import get_strategy
 
-
 DEFAULT_AGENT = "claude"
 
 
@@ -144,6 +143,162 @@ class TaskManager:
         return None
 
 
+def _normalize_task_selectors(raw: str) -> set[str]:
+    """Return possible task branch names for a user-provided selector."""
+
+    normalized = raw.strip()
+    if not normalized:
+        return set()
+    selectors = {normalized}
+    if not normalized.startswith("mc-"):
+        selectors.add(f"mc-{normalized}")
+    return selectors
+
+
+def _evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> dict[str, Any]:
+    """Inspect a task/environment to determine prune safety."""
+
+    env_path = Path(task.environment_path).expanduser()
+    issues: list[str] = []
+    warnings: list[str] = []
+
+    if not env_path.exists():
+        return {
+            "prune": True,
+            "reason": "Environment directory missing (stale metadata)",
+            "issues": issues,
+            "warnings": warnings,
+            "env_exists": False,
+            "cleanup_only": True,
+        }
+
+    status_proc = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=env_path,
+    )
+
+    if status_proc.returncode != 0:
+        details = status_proc.stderr.strip() or status_proc.stdout.strip() or "unknown error"
+        issues.append(f"failed to inspect git status: {details}")
+        if not force:
+            return {
+                "prune": False,
+                "reason": issues[0],
+                "issues": issues,
+                "warnings": warnings,
+                "env_exists": True,
+                "cleanup_only": False,
+            }
+    elif status_proc.stdout.strip():
+        issues.append("uncommitted changes present")
+
+    remote_proc = subprocess.run(
+        ["git", "remote"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=env_path,
+    )
+
+    if remote_proc.returncode != 0:
+        details = remote_proc.stderr.strip() or remote_proc.stdout.strip() or "unknown error"
+        issues.append(f"failed to list git remotes: {details}")
+    else:
+        remotes = {line.strip() for line in remote_proc.stdout.splitlines() if line.strip()}
+        if "origin" not in remotes:
+            issues.append("origin remote not configured (cannot verify pushed commits)")
+        else:
+            remote_branch = f"origin/{task.branch}"
+            rev_parse = subprocess.run(
+                ["git", "rev-parse", "--verify", remote_branch],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=env_path,
+            )
+            if rev_parse.returncode != 0:
+                issues.append(f"remote branch {remote_branch} not found (unpushed commits)")
+            else:
+                log_proc = subprocess.run(
+                    ["git", "log", f"{remote_branch}..HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=env_path,
+                )
+                if log_proc.returncode != 0:
+                    details = log_proc.stderr.strip() or log_proc.stdout.strip() or "unknown error"
+                    issues.append(f"failed to compare with {remote_branch}: {details}")
+                elif log_proc.stdout.strip():
+                    issues.append("unpushed commits present")
+
+    fetch_proc = subprocess.run(
+        ["git", "fetch", "--all"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=env_path,
+    )
+    if fetch_proc.returncode != 0:
+        details = fetch_proc.stderr.strip() or fetch_proc.stdout.strip() or "unknown error"
+        warnings.append(f"git fetch --all failed: {details}")
+
+    merged_proc = subprocess.run(
+        ["git", "branch", "--merged", default_branch],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=env_path,
+    )
+
+    merged = False
+    if merged_proc.returncode != 0:
+        details = merged_proc.stderr.strip() or merged_proc.stdout.strip() or "unknown error"
+        issues.append(f"failed to check merge status against {default_branch}: {details}")
+    else:
+        merged_branches = {
+            line.strip().lstrip("*").strip()
+            for line in merged_proc.stdout.splitlines()
+            if line.strip()
+        }
+        merged = task.branch in merged_branches
+        if not merged:
+            issues.append(f"branch not merged into {default_branch}")
+
+    if not issues and merged:
+        return {
+            "prune": True,
+            "reason": f"Branch merged into {default_branch}",
+            "issues": issues,
+            "warnings": warnings,
+            "env_exists": True,
+            "cleanup_only": False,
+        }
+
+    if force:
+        return {
+            "prune": True,
+            "reason": issues[0] if issues else f"Force pruning {task.branch}",
+            "issues": issues,
+            "warnings": warnings,
+            "env_exists": True,
+            "cleanup_only": False,
+        }
+
+    reason = issues[0] if issues else "No safe prune condition met"
+    return {
+        "prune": False,
+        "reason": reason,
+        "issues": issues,
+        "warnings": warnings,
+        "env_exists": True,
+        "cleanup_only": False,
+    }
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     """Initialize multiclaude in current repository."""
     repo_root = Path.cwd()
@@ -181,7 +336,9 @@ def cmd_new(args: argparse.Namespace) -> None:
     strategy_name = config.get("environment_strategy", "clone")
     strategy = get_strategy(strategy_name)
 
-    agent_name = args.agent if args.agent is not None else config.get("default_agent", DEFAULT_AGENT)
+    agent_name = (
+        args.agent if args.agent is not None else config.get("default_agent", DEFAULT_AGENT)
+    )
     if not isinstance(agent_name, str) or not agent_name.strip():
         print(
             "Error: Agent name cannot be empty. Provide a command with --agent or set default_agent in .multiclaude/config.json.",
@@ -265,15 +422,16 @@ def cmd_list(args: argparse.Namespace) -> None:
     pruned_tasks = []
 
     for task in tasks:
-        if task.status == "pruned":
+        if task.status == "pruned" or task.pruned_at is not None:
             pruned_tasks.append(task)
-        else:
-            # Check if environment still exists
-            environment_exists = Path(task.environment_path).expanduser().exists()
+            continue
 
-            if not environment_exists:
-                task.status = "missing"
-            active_tasks.append(task)
+        # Check if environment still exists
+        environment_exists = Path(task.environment_path).expanduser().exists()
+
+        if not environment_exists:
+            task.status = "missing"
+        active_tasks.append(task)
 
     # Display active tasks
     if active_tasks:
@@ -305,6 +463,107 @@ def cmd_list(args: argparse.Namespace) -> None:
             print(f"  - {task.branch}: branch {task.branch} (pruned {age_str}){agent_info}")
 
 
+def cmd_prune(args: argparse.Namespace) -> None:
+    """Prune completed or stale multiclaude environments."""
+
+    repo_root = Path.cwd()
+    config = MultiClaudeConfig(repo_root)
+
+    if not config.exists():
+        print("Error: Multiclaude not initialized. Run 'multiclaude init' first.", file=sys.stderr)
+        sys.exit(1)
+
+    config_data = config.load()
+    default_branch = config_data.get("default_branch", "main")
+    strategy_name = config_data.get("environment_strategy", "clone")
+    strategy = get_strategy(strategy_name)
+
+    task_mgr = TaskManager(repo_root)
+    tasks = task_mgr.load_tasks()
+    if not tasks:
+        print("No multiclaude tasks found.")
+        return
+
+    if args.task_name:
+        selectors = _normalize_task_selectors(args.task_name)
+        tasks_to_consider = [
+            task for task in tasks if task.branch in selectors or task.id in selectors
+        ]
+        if not tasks_to_consider:
+            print(f"Error: No task found matching '{args.task_name}'.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        tasks_to_consider = tasks
+
+    prune_candidates: list[tuple[Task, dict[str, Any]]] = []
+
+    for task in tasks_to_consider:
+        if task.status == "pruned":
+            print(f"Skipping {task.branch}: already pruned")
+            continue
+
+        evaluation = _evaluate_prune_candidate(task, default_branch, args.force)
+
+        for warning in evaluation.get("warnings", []):
+            print(f"Warning for {task.branch}: {warning}")
+
+        if evaluation["prune"]:
+            prune_candidates.append((task, evaluation))
+        else:
+            print(f"Skipping {task.branch}: {evaluation['reason']}")
+
+    if not prune_candidates:
+        print("No tasks eligible for pruning.")
+        return
+
+    if args.dry_run:
+        print("Dry run mode enabled. No changes will be made.")
+        for task, evaluation in prune_candidates:
+            reason = evaluation.get("reason", "")
+            print(f"Dry run: would prune {task.branch} ({reason}).")
+        return
+
+    if not args.yes:
+        branches = ", ".join(task.branch for task, _ in prune_candidates)
+        try:
+            response = input(f"Prune {len(prune_candidates)} task(s): {branches}? [y/N]: ")
+        except (EOFError, KeyboardInterrupt):
+            print("Prune cancelled.")
+            return
+        if response.strip().lower() not in {"y", "yes"}:
+            print("Prune cancelled.")
+            return
+
+    pruned_any = False
+
+    for task, evaluation in prune_candidates:
+        env_path = Path(task.environment_path).expanduser()
+        cleanup_only = evaluation.get("cleanup_only", False)
+        issues = evaluation.get("issues", [])
+        reason = evaluation.get("reason", "")
+
+        if cleanup_only:
+            print(f"Pruned task {task.branch}: {reason}")
+        else:
+            try:
+                strategy.remove(env_path)
+            except MultiClaudeError as exc:
+                print(f"Error pruning {task.branch}: {exc}", file=sys.stderr)
+                continue
+
+            if args.force and issues:
+                print(f"Force pruning {task.branch}: ignoring {', '.join(issues)}")
+            else:
+                print(f"Pruned task {task.branch}: {reason}")
+
+        pruned_any = True
+        task.status = "pruned"
+        task.pruned_at = datetime.now().isoformat()
+
+    if pruned_any:
+        task_mgr.save_tasks(tasks)
+
+
 def get_version() -> str:
     """Get the version of multiclaude."""
     try:
@@ -330,9 +589,7 @@ def main() -> None:
     parser_new.add_argument(
         "branch_name", help="Branch name for the task (mc- prefix added automatically)"
     )
-    parser_new.add_argument(
-        "--no-launch", "-n", action="store_true", help="Don't launch the agent"
-    )
+    parser_new.add_argument("--no-launch", "-n", action="store_true", help="Don't launch the agent")
     parser_new.add_argument(
         "--base",
         default="main",
@@ -349,6 +606,16 @@ def main() -> None:
     parser_list = subparsers.add_parser("list", help="List all multiclaude tasks")
     parser_list.add_argument("--show-pruned", action="store_true", help="Show pruned tasks")
     parser_list.set_defaults(func=cmd_list)
+
+    # prune command
+    parser_prune = subparsers.add_parser("prune", help="Prune merged or stale tasks")
+    parser_prune.add_argument("task_name", nargs="?", help="Specific task to prune")
+    parser_prune.add_argument("--force", action="store_true", help="Override safety checks")
+    parser_prune.add_argument(
+        "--dry-run", action="store_true", help="Show actions without applying changes"
+    )
+    parser_prune.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
+    parser_prune.set_defaults(func=cmd_prune)
 
     args = parser.parse_args()
 

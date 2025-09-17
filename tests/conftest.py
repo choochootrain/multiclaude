@@ -78,13 +78,12 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
     original_run = subprocess.run
 
     def mock_run(cmd, *args, **kwargs):
-        if isinstance(cmd, list):
-            if cmd and cmd[0] in agent_commands:
-                result = MagicMock()
-                result.returncode = 0
-                result.stdout = f"{cmd[0]} launched (mocked)"
-                result.stderr = ""
-                return result
+        if isinstance(cmd, list) and cmd and cmd[0] in agent_commands:
+            result = MagicMock()
+            result.returncode = 0
+            result.stdout = f"{cmd[0]} launched (mocked)"
+            result.stderr = ""
+            return result
         # Let other commands through
         return original_run(cmd, *args, **kwargs)
 
