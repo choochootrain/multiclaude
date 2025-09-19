@@ -2,7 +2,7 @@
 
 import subprocess
 
-from multiclaude.strategies import CloneStrategy, generate_hash
+from multiclaude.strategies import CloneStrategy, find_available_environment, generate_hash
 
 
 def create_mock_config(base_dir):
@@ -46,11 +46,9 @@ def test_generate_hash():
 def test_find_available_environment(tmp_path):
     """Test finding available environments in various scenarios."""
     repo_name = "test-repo"
-    mock_config = create_mock_config(tmp_path)
-    strategy = CloneStrategy(mock_config)
 
     # Test when no environment directory exists
-    result = strategy.find_available_environment(repo_name)
+    result = find_available_environment(tmp_path, repo_name)
     assert result is None
 
     # Test when directory exists but no available envs
@@ -59,21 +57,21 @@ def test_find_available_environment(tmp_path):
     (repo_dir / "mc-my-feature-task").mkdir()  # Task environment, not available
     (repo_dir / "mc-another-task").mkdir()  # Another task environment
 
-    result = strategy.find_available_environment(repo_name)
+    result = find_available_environment(tmp_path, repo_name)
     assert result is None
 
     # Test when one available env exists
     available_env = repo_dir / "avail-abc123"
     available_env.mkdir()
 
-    result = strategy.find_available_environment(repo_name)
+    result = find_available_environment(tmp_path, repo_name)
     assert result == available_env
 
     # Test when multiple available envs exist
     env2 = repo_dir / "avail-xyz789"
     env2.mkdir()
 
-    result = strategy.find_available_environment(repo_name)
+    result = find_available_environment(tmp_path, repo_name)
     # Should return one of them (we don't care which)
     assert result in [available_env, env2]
 

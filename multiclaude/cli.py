@@ -23,7 +23,26 @@ from .config import (
 from .errors import MultiClaudeError, NotInitializedError
 from .git_utils import branch_exists, is_git_repo, ref_exists
 from .strategies import get_strategy
-from .tasks import Task, TaskManager, evaluate_prune_candidate, normalize_task_selectors
+from .tasks import (
+    Task,
+    create_task,
+    evaluate_prune_candidate,
+    initialize_tasks,
+    load_tasks,
+    normalize_task_selectors,
+    save_tasks,
+)
+
+
+def exit_with_error(msg: str) -> None:
+    """Print error message and exit."""
+    print(f"Error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def print_success(msg: str) -> None:
+    """Print success message with checkmark."""
+    print(f"✓ {msg}")
 
 
 def get_version() -> str:
@@ -40,8 +59,7 @@ def validate_config() -> Config:
         repo_root = Path.cwd()
         return load_config(repo_root)
     except NotInitializedError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(str(e))
 
 
 def cmd_init(args: argparse.Namespace) -> None:
@@ -49,23 +67,19 @@ def cmd_init(args: argparse.Namespace) -> None:
     repo_root = Path.cwd()
 
     if not is_git_repo(repo_root):
-        print(
-            "Error: Not a git repository. Please run this command in a git repo.", file=sys.stderr
-        )
-        sys.exit(1)
+        exit_with_error("Not a git repository. Please run this command in a git repo.")
 
     if config_exists(repo_root):
         print("Multiclaude already initialized in this repository.")
         return
 
-    # Initialize config
-    initialize_config(repo_root, environments_dir=getattr(args, "environments_dir", None))
-    task_mgr = TaskManager(repo_root)
-    task_mgr.initialize()
+    # Initialize config and tasks
+    config = initialize_config(repo_root, environments_dir=getattr(args, "environments_dir", None))
+    initialize_tasks(config)
 
-    print("✓ Initialized multiclaude in this repository")
-    print("✓ Created .multiclaude/ directory")
-    print("✓ Added .multiclaude to .git/info/exclude")
+    print_success("Initialized multiclaude in this repository")
+    print_success("Created .multiclaude/ directory")
+    print_success("Added .multiclaude to .git/info/exclude")
 
 
 def cmd_new(args: argparse.Namespace) -> None:
@@ -76,30 +90,24 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     agent_name = (args.agent if args.agent is not None else config.default_agent).strip()
     if not agent_name:
-        print(
-            "Error: Agent name cannot be empty. Provide a command with --agent or set default_agent in .multiclaude/config.json.",
-            file=sys.stderr,
+        exit_with_error(
+            "Agent name cannot be empty. Provide a command with --agent or set default_agent in .multiclaude/config.json."
         )
-        sys.exit(1)
 
     agent_path = shutil.which(agent_name)
     if agent_path is None:
-        print(
-            f"Error: Agent '{agent_name}' not found on PATH. Install it or update --agent/default_agent to a valid command.",
-            file=sys.stderr,
+        exit_with_error(
+            f"Agent '{agent_name}' not found on PATH. Install it or update --agent/default_agent to a valid command."
         )
-        sys.exit(1)
 
     branch_name = f"mc-{args.branch_name}"
 
     if branch_exists(config.repo_root, branch_name):
-        print(f"Error: Branch '{branch_name}' already exists.", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(f"Branch '{branch_name}' already exists.")
 
     # Validate base ref exists
     if not ref_exists(config.repo_root, args.base):
-        print(f"Error: Base ref '{args.base}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(f"Base ref '{args.base}' does not exist.")
 
     print(
         f"Creating new isolated environment for '{branch_name}' from '{args.base}' using strategy: {strategy.name} (agent: {agent_name})"
@@ -110,25 +118,17 @@ def cmd_new(args: argparse.Namespace) -> None:
             config.repo_root, branch_name, base_ref=args.base
         )
     except MultiClaudeError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(str(e))
 
     # Add task to tasks.json
-    task = Task(
-        id=branch_name,
-        branch=branch_name,
-        created_at=datetime.now().isoformat(),
-        status="active",
-        environment_path=str(environment_path),
-        agent=agent_name,
-    )
-    task_mgr = TaskManager(config.repo_root)
-    task_mgr.add_task(task)
+    create_task(config, branch_name, environment_path, agent_name)
 
     if was_reused:
-        print(f"✓ Reused existing environment for branch '{branch_name}' at {environment_path}")
+        print_success(
+            f"Reused existing environment for branch '{branch_name}' at {environment_path}"
+        )
     else:
-        print(f"✓ Created new environment for branch '{branch_name}' at {environment_path}")
+        print_success(f"Created new environment for branch '{branch_name}' at {environment_path}")
 
     if not args.no_launch:
         print(f"Launching {agent_name} in {environment_path}...")
@@ -142,9 +142,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     """List all multiclaude tasks."""
 
     config = validate_config()
-
-    task_mgr = TaskManager(config.repo_root)
-    tasks = task_mgr.load_tasks()
+    tasks = load_tasks(config)
 
     if not tasks:
         print("No multiclaude tasks found.")
@@ -204,8 +202,7 @@ def cmd_prune(args: argparse.Namespace) -> None:
     default_branch = config.default_branch
     strategy = get_strategy(config)
 
-    task_mgr = TaskManager(config.repo_root)
-    tasks = task_mgr.load_tasks()
+    tasks = load_tasks(config)
     if not tasks:
         print("No multiclaude tasks found.")
         return
@@ -216,8 +213,7 @@ def cmd_prune(args: argparse.Namespace) -> None:
             task for task in tasks if task.branch in selectors or task.id in selectors
         ]
         if not tasks_to_consider:
-            print(f"Error: No task found matching '{args.task_name}'.", file=sys.stderr)
-            sys.exit(1)
+            exit_with_error(f"No task found matching '{args.task_name}'.")
     else:
         tasks_to_consider = tasks
 
@@ -287,7 +283,7 @@ def cmd_prune(args: argparse.Namespace) -> None:
         task.pruned_at = datetime.now().isoformat()
 
     if pruned_any:
-        task_mgr.save_tasks(tasks)
+        save_tasks(config, tasks)
 
 
 def cmd_config(args: argparse.Namespace) -> None:
@@ -301,8 +297,7 @@ def cmd_config(args: argparse.Namespace) -> None:
             config = set_config_value(config, args.path, args.write)
             print(f"Set {args.path} = {args.write}")
         except MultiClaudeError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
+            exit_with_error(str(e))
     else:
         # Read mode
         try:
@@ -316,8 +311,7 @@ def cmd_config(args: argparse.Namespace) -> None:
                 else:
                     print(value)
         except MultiClaudeError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
+            exit_with_error(str(e))
 
 
 def main() -> None:

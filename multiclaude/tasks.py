@@ -1,8 +1,13 @@
 import json
-import subprocess
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from .git_utils import check_git_status, check_unpushed_commits, git, is_branch_merged
+
+if TYPE_CHECKING:
+    from .config import Config
 
 
 @dataclass
@@ -17,53 +22,58 @@ class Task:
     agent: str
     pruned_at: str | None = None
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Task":
-        """Create Task from dictionary."""
-        return cls(**data)
+
+def _get_tasks_file(config: "Config") -> Path:
+    """Get path to tasks file."""
+    return config.repo_root / ".multiclaude" / "tasks.json"
 
 
-class TaskManager:
-    """Manages tasks in tasks.json."""
+def initialize_tasks(config: "Config") -> None:
+    """Initialize tasks file."""
+    tasks_file = _get_tasks_file(config)
+    tasks_file.write_text("[]")
 
-    def __init__(self, repo_root: Path):
-        self.repo_root = repo_root
-        self.tasks_file = repo_root / ".multiclaude" / "tasks.json"
 
-    def initialize(self) -> None:
-        """Initialize empty tasks file."""
-        self.tasks_file.write_text("[]")
+def load_tasks(config: "Config") -> list[Task]:
+    """Load all tasks."""
+    tasks_file = _get_tasks_file(config)
+    if not tasks_file.exists():
+        return []
+    data = json.loads(tasks_file.read_text())
+    return [Task(**task) for task in data]
 
-    def load_tasks(self) -> list[Task]:
-        """Load all tasks."""
-        if not self.tasks_file.exists():
-            return []
-        data = json.loads(self.tasks_file.read_text())
-        return [Task.from_dict(task) for task in data]
 
-    def save_tasks(self, tasks: list[Task]) -> None:
-        """Save tasks to file."""
-        data = [asdict(task) for task in tasks]
-        self.tasks_file.write_text(json.dumps(data, indent=2))
+def save_tasks(config: "Config", tasks: list[Task]) -> None:
+    """Save tasks to file."""
+    tasks_file = _get_tasks_file(config)
+    tasks_file.write_text(json.dumps([asdict(t) for t in tasks], indent=2))
 
-    def add_task(self, task: Task) -> None:
-        """Add a new task."""
-        tasks = self.load_tasks()
-        tasks.append(task)
-        self.save_tasks(tasks)
 
-    def get_task(self, branch_name: str) -> Task | None:
-        """Get task by branch name."""
-        tasks = self.load_tasks()
-        for task in tasks:
-            if task.branch == branch_name:
-                return task
-        return None
+def create_task(
+    config: "Config", branch_name: str, environment_path: Path, agent_name: str
+) -> Task:
+    """Create and add a new task."""
+    task = Task(
+        id=branch_name,
+        branch=branch_name,
+        created_at=datetime.now().isoformat(),
+        status="active",
+        environment_path=str(environment_path),
+        agent=agent_name,
+    )
+    tasks = load_tasks(config)
+    tasks.append(task)
+    save_tasks(config, tasks)
+    return task
+
+
+def get_task(config: "Config", branch_name: str) -> Task | None:
+    """Get task by branch name."""
+    return next((t for t in load_tasks(config) if t.branch == branch_name), None)
 
 
 def normalize_task_selectors(raw: str) -> set[str]:
     """Return possible task branch names for a user-provided selector."""
-
     normalized = raw.strip()
     if not normalized:
         return set()
@@ -75,140 +85,58 @@ def normalize_task_selectors(raw: str) -> set[str]:
 
 def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> dict[str, Any]:
     """Inspect a task/environment to determine prune safety."""
-
     env_path = Path(task.environment_path).expanduser()
-    issues: list[str] = []
-    warnings: list[str] = []
 
+    # Handle missing environment
     if not env_path.exists():
         return {
             "prune": True,
             "reason": "Environment directory missing (stale metadata)",
-            "issues": issues,
-            "warnings": warnings,
+            "issues": [],
+            "warnings": [],
             "env_exists": False,
             "cleanup_only": True,
         }
 
-    status_proc = subprocess.run(
-        ["git", "status", "--porcelain"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
+    issues = []
+    warnings = []
 
-    if status_proc.returncode != 0:
-        details = status_proc.stderr.strip() or status_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to inspect git status: {details}")
-        if not force:
-            return {
-                "prune": False,
-                "reason": issues[0],
-                "issues": issues,
-                "warnings": warnings,
-                "env_exists": True,
-                "cleanup_only": False,
-            }
-    elif status_proc.stdout.strip():
-        issues.append("uncommitted changes present")
+    # Check working directory
+    is_clean, msg = check_git_status(env_path)
+    if msg:
+        issues.append(msg)
+        if not is_clean and not force:
+            return _prune_result(False, msg, issues, warnings)
 
-    remote_proc = subprocess.run(
-        ["git", "remote"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
+    # Check unpushed commits
+    issues.extend(check_unpushed_commits(env_path, task.branch))
 
-    if remote_proc.returncode != 0:
-        details = remote_proc.stderr.strip() or remote_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to list git remotes: {details}")
-    else:
-        remotes = {line.strip() for line in remote_proc.stdout.splitlines() if line.strip()}
-        if "origin" not in remotes:
-            issues.append("origin remote not configured (cannot verify pushed commits)")
-        else:
-            remote_branch = f"origin/{task.branch}"
-            rev_parse = subprocess.run(
-                ["git", "rev-parse", "--verify", remote_branch],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=env_path,
-            )
-            if rev_parse.returncode != 0:
-                issues.append(f"remote branch {remote_branch} not found (unpushed commits)")
-            else:
-                log_proc = subprocess.run(
-                    ["git", "log", f"{remote_branch}..HEAD"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=env_path,
-                )
-                if log_proc.returncode != 0:
-                    details = log_proc.stderr.strip() or log_proc.stdout.strip() or "unknown error"
-                    issues.append(f"failed to compare with {remote_branch}: {details}")
-                elif log_proc.stdout.strip():
-                    issues.append("unpushed commits present")
+    # Fetch latest (non-blocking)
+    if git(["fetch", "--all"], env_path)[0] != 0:
+        warnings.append("git fetch --all failed")
 
-    fetch_proc = subprocess.run(
-        ["git", "fetch", "--all"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-    if fetch_proc.returncode != 0:
-        details = fetch_proc.stderr.strip() or fetch_proc.stdout.strip() or "unknown error"
-        warnings.append(f"git fetch --all failed: {details}")
+    # Check merge status
+    is_merged, msg = is_branch_merged(env_path, task.branch, default_branch)
+    if msg:
+        issues.append(msg)
 
-    merged_proc = subprocess.run(
-        ["git", "branch", "--merged", default_branch],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-
-    merged = False
-    if merged_proc.returncode != 0:
-        details = merged_proc.stderr.strip() or merged_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to check merge status against {default_branch}: {details}")
-    else:
-        merged_branches = {
-            line.strip().lstrip("*").strip()
-            for line in merged_proc.stdout.splitlines()
-            if line.strip()
-        }
-        merged = task.branch in merged_branches
-        if not merged:
-            issues.append(f"branch not merged into {default_branch}")
-
-    if not issues and merged:
-        return {
-            "prune": True,
-            "reason": f"Branch merged into {default_branch}",
-            "issues": issues,
-            "warnings": warnings,
-            "env_exists": True,
-            "cleanup_only": False,
-        }
+    # Make prune decision
+    if not issues and is_merged:
+        return _prune_result(True, f"Branch merged into {default_branch}", issues, warnings)
 
     if force:
-        return {
-            "prune": True,
-            "reason": issues[0] if issues else f"Force pruning {task.branch}",
-            "issues": issues,
-            "warnings": warnings,
-            "env_exists": True,
-            "cleanup_only": False,
-        }
+        reason = issues[0] if issues else f"Force pruning {task.branch}"
+        return _prune_result(True, reason, issues, warnings)
 
-    reason = issues[0] if issues else "No safe prune condition met"
+    return _prune_result(
+        False, issues[0] if issues else "No safe prune condition met", issues, warnings
+    )
+
+
+def _prune_result(prune: bool, reason: str, issues: list, warnings: list) -> dict[str, Any]:
+    """Create prune result dict."""
     return {
-        "prune": False,
+        "prune": prune,
         "reason": reason,
         "issues": issues,
         "warnings": warnings,

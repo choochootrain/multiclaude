@@ -174,7 +174,7 @@ def test_config_unknown_path(isolated_repo, capsys):
         multiclaude.cmd_config(args_config)
 
     captured = capsys.readouterr()
-    assert "Unknown configuration path: unknown_field" in captured.err
+    assert "Unknown configuration field: unknown_field" in captured.err
 
 
 def test_config_write_unknown_path(isolated_repo, capsys):
@@ -192,7 +192,7 @@ def test_config_write_unknown_path(isolated_repo, capsys):
         multiclaude.cmd_config(args_config)
 
     captured = capsys.readouterr()
-    assert "Unknown configuration path: unknown_field" in captured.err
+    assert "Unknown configuration field: unknown_field" in captured.err
 
 
 def test_config_not_initialized(isolated_repo, capsys):
