@@ -99,6 +99,21 @@ See [README.md](README.md) for overview and usage.
 - [ ] Cost reporting
 
 
+### AI Effectiveness Tracking
+**Goal:** Measure and improve AI-assisted development effectiveness
+
+**Metrics:**
+- Task success rate by type (bug/feature/refactor/docs)
+- Prompt effectiveness patterns
+- Code quality metrics (tests/lint/reviews)
+- Manual intervention requirements
+
+**Implementation:**
+- Add metadata fields to tasks.json for tracking
+- Create evaluation scripts in tools/
+- Export metrics for analysis
+- Build simple dashboard for trends
+
 ### Future Phases (Backlog/Unplanned)
 - [ ] Shell directory persistence - Keep user in task directory after Claude exits (complex shell interaction patterns)
 - [ ] Concurrency locking - Prevent race conditions when multiple `multiclaude new` run simultaneously
