@@ -13,10 +13,10 @@ from tests.conftest import configure_git_repo
 
 
 @pytest.fixture
-def repo_with_submodules(isolated_repo):
+def repo_with_submodules(isolated_git_repo):
     """Create a repo with submodules for testing advanced git strategies."""
-    base_dir = isolated_repo.parent
-    main_repo = isolated_repo
+    base_dir = isolated_git_repo.parent
+    main_repo = isolated_git_repo
 
     # Create external library repo (submodule)
     lib_repo = base_dir / "shared-lib"

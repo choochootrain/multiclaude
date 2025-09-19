@@ -8,7 +8,7 @@ from multiclaude import cli as multiclaude
 
 def test_init_success(isolated_repo):
     """Test that init creates all required files and updates git exclude."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Create args object and call init directly
     args = SimpleNamespace()
@@ -67,7 +67,7 @@ def test_init_fails_non_git_repo(tmp_path, monkeypatch, capsys):
 
 def test_init_idempotent(isolated_repo, capsys):
     """Test that running init twice is safe and doesn't error."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Run init first time
     args = SimpleNamespace()

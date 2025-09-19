@@ -1,7 +1,6 @@
 """Tests for multiclaude new command."""
 
 import json
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -10,14 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 from multiclaude import cli as multiclaude
+from multiclaude.config import load_config
 
 
 def test_new_creates_task(isolated_repo):
     """Test that new command creates worktree, branch, and updates tasks.json."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
-    # Initialize first
+    # Initialize first with environments_dir
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create new task
@@ -25,8 +26,7 @@ def test_new_creates_task(isolated_repo):
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
-    expected_environment = Path(environment_dir) / repo_path.name / "mc-test-feature"
+    expected_environment = isolated_repo.environments_dir / repo_path.name / "mc-test-feature"
     assert expected_environment.exists()
     assert (expected_environment / ".git").exists()
     assert (expected_environment / "README.md").exists()
@@ -55,8 +55,10 @@ def test_new_creates_task(isolated_repo):
 
 def test_new_fails_duplicate_branch(isolated_repo, capsys):
     """Test that new command fails when branch already exists."""
+
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create first task
@@ -76,8 +78,10 @@ def test_new_fails_duplicate_branch(isolated_repo, capsys):
 
 def test_new_no_launch_flag(isolated_repo, capsys):
     """Test that --no-launch flag prevents claude from being launched."""
+
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create task with --no-launch
@@ -95,6 +99,7 @@ def test_new_short_n_flag(isolated_repo, capsys):
     """Test that -n short flag works the same as --no-launch."""
     # Initialize multiclaude
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create task with -n (simulated as no_launch=True in args)
@@ -109,8 +114,10 @@ def test_new_short_n_flag(isolated_repo, capsys):
 
 def test_new_would_launch_claude(isolated_repo, capsys):
     """Test that without --no-launch, the agent is launched."""
+
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create task without --no-launch (this will launch claude, but mocked)
@@ -126,9 +133,10 @@ def test_new_would_launch_claude(isolated_repo, capsys):
 
 def test_new_with_custom_agent_flag(isolated_repo, capsys):
     """Test that specifying a custom agent persists and surfaces correctly."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(
@@ -149,9 +157,10 @@ def test_new_with_custom_agent_flag(isolated_repo, capsys):
 
 def test_new_fails_when_agent_missing(isolated_repo, monkeypatch, capsys):
     """Test that new command fails when the requested agent is unavailable."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     original_which = shutil.which
@@ -183,10 +192,11 @@ def test_new_fails_when_agent_missing(isolated_repo, monkeypatch, capsys):
 
 def test_new_with_custom_base_branch(isolated_repo):
     """Test creating task from a different base branch."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create a base branch first
@@ -200,8 +210,8 @@ def test_new_with_custom_base_branch(isolated_repo):
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
-    expected_environment = Path(environment_dir) / repo_path.name / "mc-feature-from-develop"
+    environment_dir = isolated_repo.environments_dir
+    expected_environment = environment_dir / repo_path.name / "mc-feature-from-develop"
     assert expected_environment.exists()
 
     # Verify the branch was created from develop by checking git history
@@ -249,8 +259,10 @@ def test_new_with_custom_base_branch(isolated_repo):
 
 def test_new_with_invalid_base_ref(isolated_repo, capsys):
     """Test that new command fails when base ref doesn't exist."""
+
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Try to create task from non-existent branch
@@ -269,7 +281,7 @@ def test_new_with_invalid_base_ref(isolated_repo, capsys):
 
 def test_new_with_origin_remote(isolated_repo):
     """Test new command configures remotes correctly when origin exists."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Add a fake GitHub remote to the base repo
     subprocess.run(
@@ -280,6 +292,7 @@ def test_new_with_origin_remote(isolated_repo):
 
     # Initialize multiclaude
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create new task
@@ -287,8 +300,8 @@ def test_new_with_origin_remote(isolated_repo):
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
-    expected_environment = Path(environment_dir) / repo_path.name / "mc-test-remotes"
+    environment_dir = isolated_repo.environments_dir
+    expected_environment = environment_dir / repo_path.name / "mc-test-remotes"
     assert expected_environment.exists()
 
     # Check 'local' remote points to base repo
@@ -332,10 +345,11 @@ def test_new_with_origin_remote(isolated_repo):
 
 def test_new_without_origin_remote(isolated_repo):
     """Test new command when base repo has no origin remote."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Initialize multiclaude (no origin remote added)
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create new task
@@ -345,8 +359,8 @@ def test_new_without_origin_remote(isolated_repo):
     multiclaude.cmd_new(args_new)
 
     # Check environment was created
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
-    expected_environment = Path(environment_dir) / repo_path.name / "mc-test-no-origin"
+    environment_dir = isolated_repo.environments_dir
+    expected_environment = environment_dir / repo_path.name / "mc-test-no-origin"
     assert expected_environment.exists()
 
     # Check 'local' remote exists and points to base repo
@@ -390,10 +404,11 @@ def test_new_without_origin_remote(isolated_repo):
 
 def test_new_reuses_available_environment(isolated_repo, capsys):
     """Test that new command reuses available environments."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Initialize multiclaude
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create first task
@@ -405,15 +420,16 @@ def test_new_reuses_available_environment(isolated_repo, capsys):
     assert "Reused existing environment" not in captured.out
 
     # Get the environment path
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
+    environment_dir = isolated_repo.environments_dir
     task1_path = Path(environment_dir) / repo_path.name / "mc-task1"
 
     # Manually remove the task to create an available environment
     # (since there's no remove command yet, we use the strategy directly)
-    from multiclaude.git_utils import get_environment_base_dir
     from multiclaude.strategies import CloneStrategy
 
-    strategy = CloneStrategy(get_environment_base_dir())
+    # Load config for the strategy
+    config = load_config(repo_path)
+    strategy = CloneStrategy(config)
     strategy.remove(task1_path)
 
     # Verify available environment was created

@@ -16,21 +16,22 @@ def cmd_reset(args: argparse.Namespace) -> None:
 
     # Initialize multiclaude by calling the function directly
     import os
-    import sys
 
     # Change to sandbox repo and run init
     original_dir = os.getcwd()
     try:
         os.chdir(sandbox.repo_path)
-        os.environ["MULTICLAUDE_ENVIRONMENT_DIR"] = str(sandbox.worktree_path)
 
         # Import and run init directly
         from types import SimpleNamespace
 
         from multiclaude.cli import cmd_init
 
+        # Initialize with environments_dir directly
         args = SimpleNamespace()
+        args.environments_dir = sandbox.worktree_path
         cmd_init(args)
+
         result = SimpleNamespace(returncode=0, stdout="Initialized", stderr="")
     except Exception as e:
         result = SimpleNamespace(returncode=1, stdout="", stderr=str(e))

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 from collections.abc import Generator
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -28,8 +29,8 @@ def configure_git_repo(path: Path) -> None:
 
 
 @pytest.fixture
-def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
-    """Create an isolated test repository.
+def isolated_git_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
+    """Create an isolated git repository for testing.
 
     Yields:
         Path to the test repository
@@ -53,13 +54,30 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
         ["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True, check=True
     )
 
-    # Set environment directory for tests
-    environment_dir = tmp_path / "environments"
-    environment_dir.mkdir(exist_ok=True)
-    monkeypatch.setenv("MULTICLAUDE_ENVIRONMENT_DIR", str(environment_dir))
-
     # Change to repo directory
     monkeypatch.chdir(repo_path)
+
+    yield repo_path
+
+
+@dataclass
+class MCTestRepo:
+    """Test repository with multiclaude-specific setup."""
+
+    repo_path: Path
+    environments_dir: Path
+
+
+@pytest.fixture
+def isolated_repo(isolated_git_repo: Path, tmp_path: Path, monkeypatch) -> MCTestRepo:
+    """Create an isolated repository with multiclaude test setup.
+
+    Returns:
+        MCTestRepo with repo_path and environments_dir
+    """
+    # Create environments directory for tests
+    environments_dir = tmp_path / "environments"
+    environments_dir.mkdir(exist_ok=True)
 
     # Mock subprocess.run to handle "which claude" and actual claude launches
     agent_commands: set[str] = set()
@@ -100,7 +118,7 @@ def isolated_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None]:
 
     monkeypatch.setattr("os.chdir", mock_chdir)
 
-    yield repo_path
+    return MCTestRepo(repo_path=isolated_git_repo, environments_dir=environments_dir)
 
 
 @pytest.fixture

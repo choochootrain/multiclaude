@@ -12,10 +12,6 @@ def main() -> None:
     # Set up sandbox environment
     script_dir = Path(__file__).parent.parent
     sandbox_repo = script_dir / "repos" / "sandbox" / "main"
-    sandbox_worktrees = script_dir / "repos" / "sandbox" / "worktrees"
-
-    # Set environment variable for environment directory
-    os.environ["MULTICLAUDE_ENVIRONMENT_DIR"] = str(sandbox_worktrees)
 
     # Change to sandbox repo
     if sandbox_repo.exists():

@@ -18,7 +18,7 @@ from tests.conftest import configure_git_repo
 @pytest.fixture
 def repo_with_deps(isolated_repo):
     """Create a repo with simulated dependencies and tooling."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Add package.json for Node.js simulation
     package_json = {

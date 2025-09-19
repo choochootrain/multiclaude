@@ -5,6 +5,23 @@ import subprocess
 from multiclaude.strategies import CloneStrategy, generate_hash
 
 
+def create_mock_config(base_dir):
+    """Create a mock Config with the given base_dir."""
+    from pathlib import Path
+
+    from multiclaude.config import Config
+
+    return Config(
+        version="1.0.0",
+        repo_root=Path.cwd(),
+        default_branch="main",
+        created_at="2024-01-01",
+        environment_strategy="clone",
+        default_agent="claude",
+        environments_dir=base_dir,
+    )
+
+
 def test_generate_hash():
     """Test hash generation for available environment names."""
     hash1 = generate_hash()
@@ -29,7 +46,8 @@ def test_generate_hash():
 def test_find_available_environment(tmp_path):
     """Test finding available environments in various scenarios."""
     repo_name = "test-repo"
-    strategy = CloneStrategy(tmp_path)
+    mock_config = create_mock_config(tmp_path)
+    strategy = CloneStrategy(mock_config)
 
     # Test when no environment directory exists
     result = strategy.find_available_environment(repo_name)
@@ -60,10 +78,11 @@ def test_find_available_environment(tmp_path):
     assert result in [available_env, env2]
 
 
-def test_clone_strategy_reuses_available_environment(isolated_repo, tmp_path):
+def test_clone_strategy_reuses_available_environment(isolated_git_repo, tmp_path):
     """Test that CloneStrategy reuses available environments."""
-    repo_path = isolated_repo
-    strategy = CloneStrategy(tmp_path)
+    repo_path = isolated_git_repo
+    mock_config = create_mock_config(tmp_path)
+    strategy = CloneStrategy(mock_config)
 
     # Create first task
     task1_path, was_reused = strategy.create(repo_path, "mc-task1", "main")
@@ -95,10 +114,11 @@ def test_clone_strategy_reuses_available_environment(isolated_repo, tmp_path):
     assert len(available_envs_after) == 0
 
 
-def test_clone_strategy_remove_creates_available_environment(isolated_repo, tmp_path):
+def test_clone_strategy_remove_creates_available_environment(isolated_git_repo, tmp_path):
     """Test that removing a clone creates a clean available environment."""
-    repo_path = isolated_repo
-    strategy = CloneStrategy(tmp_path)
+    repo_path = isolated_git_repo
+    mock_config = create_mock_config(tmp_path)
+    strategy = CloneStrategy(mock_config)
 
     # Create a task
     task_path, was_reused = strategy.create(repo_path, "mc-test-task", "main")

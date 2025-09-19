@@ -1,6 +1,5 @@
 """Git utility functions for multiclaude."""
 
-import os
 import subprocess
 from pathlib import Path
 
@@ -8,13 +7,6 @@ from pathlib import Path
 def get_repo_name(repo_root: Path) -> str:
     """Get repository name from path."""
     return repo_root.name
-
-
-def get_environment_base_dir() -> Path:
-    """Get base directory for environments (worktrees or clones)."""
-    if env_dir := os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR"):
-        return Path(env_dir)
-    return Path.home() / "multiclaude-environments"
 
 
 def is_git_repo(repo_root: Path) -> bool:

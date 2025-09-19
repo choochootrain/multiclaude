@@ -8,8 +8,9 @@ import subprocess
 from pathlib import Path
 from typing import Protocol
 
+from .config import Config
 from .errors import MultiClaudeError
-from .git_utils import configure_clone_remotes, get_environment_base_dir, get_repo_name, ref_exists
+from .git_utils import configure_clone_remotes, get_repo_name, ref_exists
 
 
 class EnvironmentStrategy(Protocol):
@@ -41,9 +42,10 @@ class EnvironmentStrategy(Protocol):
 class WorktreeStrategy(EnvironmentStrategy):
     """Strategy for creating environments using git worktrees."""
 
-    def __init__(self, base_dir: Path):
+    def __init__(self, config: Config):
         """Initialize the worktree strategy."""
-        self.base_dir = base_dir
+        self.config = config
+        self.base_dir = config.environments_dir
 
     @property
     def name(self) -> str:
@@ -104,9 +106,10 @@ def generate_hash(length: int = 7) -> str:
 class CloneStrategy(EnvironmentStrategy):
     """Strategy for creating environments by cloning the repository."""
 
-    def __init__(self, base_dir: Path):
+    def __init__(self, config: Config):
         """Initialize the clone strategy."""
-        self.base_dir = base_dir
+        self.config = config
+        self.base_dir = config.environments_dir
 
     @property
     def name(self) -> str:
@@ -321,11 +324,10 @@ class CloneStrategy(EnvironmentStrategy):
         print(f"Environment renamed to {available_name} for reuse")
 
 
-def get_strategy(strategy_name: str | None) -> EnvironmentStrategy:
+def get_strategy(config: Config) -> EnvironmentStrategy:
     """Get an instance of the specified strategy."""
-    base_dir = get_environment_base_dir()
-    if strategy_name == "worktree":
-        return WorktreeStrategy(base_dir)
-    if strategy_name == "clone":
-        return CloneStrategy(base_dir)
-    return CloneStrategy(base_dir)
+    if config.environment_strategy == "worktree":
+        return WorktreeStrategy(config)
+    if config.environment_strategy == "clone":
+        return CloneStrategy(config)
+    return CloneStrategy(config)

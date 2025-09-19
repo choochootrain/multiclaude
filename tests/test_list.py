@@ -1,11 +1,9 @@
 """Tests for multiclaude list command."""
 
 import json
-import os
 import shutil
 import subprocess
 from datetime import datetime
-from pathlib import Path
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude
@@ -13,8 +11,10 @@ from multiclaude import cli as multiclaude
 
 def test_list_empty(isolated_repo, capsys):
     """Test list command when no tasks exist."""
+
     # Initialize first
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # List tasks (should be empty)
@@ -29,6 +29,7 @@ def test_list_single_task(isolated_repo, capsys):
     """Test list command with one task."""
     # Initialize and create one task
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main", agent=None)
@@ -49,6 +50,7 @@ def test_list_multiple_tasks(isolated_repo, capsys):
     """Test list command with multiple tasks."""
     # Initialize and create multiple tasks
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     for name in ["feature-one", "feature-two", "bugfix"]:
@@ -72,18 +74,18 @@ def test_list_multiple_tasks(isolated_repo, capsys):
 
 def test_list_detects_missing_worktree(isolated_repo, capsys):
     """Test that list handles deleted worktrees gracefully."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     # Initialize and create a task
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Manually delete the environment directory (simulate external deletion)
-    environment_dir = os.environ.get("MULTICLAUDE_ENVIRONMENT_DIR")
-    environment_path = Path(environment_dir) / repo_path.name / "mc-feature"
+    environment_path = isolated_repo.environments_dir / repo_path.name / "mc-feature"
     if environment_path.exists():
         shutil.rmtree(environment_path)
 
@@ -107,9 +109,10 @@ def test_list_detects_missing_worktree(isolated_repo, capsys):
 
 def test_list_hides_pruned_tasks_by_default(isolated_repo, capsys):
     """Pruned tasks should only show when --show-pruned is used."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     # Create two tasks

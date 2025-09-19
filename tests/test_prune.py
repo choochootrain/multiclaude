@@ -32,10 +32,11 @@ def _read_tasks(repo_path: Path) -> list[dict]:
 
 def test_prune_prunes_merged_branch(isolated_repo, capsys):
     """Prune should recycle merged clone environments and mark metadata."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
     _setup_remote(repo_path)
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main", agent=None)
@@ -89,10 +90,11 @@ def test_prune_prunes_merged_branch(isolated_repo, capsys):
 
 def test_prune_skips_unmerged_branch(isolated_repo, capsys):
     """Prune should skip branches that have not been merged yet."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
     _setup_remote(repo_path)
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="wip", no_launch=True, base="main", agent=None)
@@ -134,10 +136,11 @@ def test_prune_skips_unmerged_branch(isolated_repo, capsys):
 
 def test_prune_force_removes_dirty_environment(isolated_repo, capsys):
     """--force should prune even when safeguards would normally block it."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
     _setup_remote(repo_path)
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="cleanup", no_launch=True, base="main", agent=None)
@@ -188,10 +191,11 @@ def test_prune_force_removes_dirty_environment(isolated_repo, capsys):
 
 def test_prune_dry_run_does_not_change_state(isolated_repo, capsys):
     """Dry run should report actions without modifying environments or tasks."""
-    repo_path = isolated_repo
+    repo_path = isolated_repo.repo_path
     _setup_remote(repo_path)
 
     args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
     multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="dryrun", no_launch=True, base="main", agent=None)

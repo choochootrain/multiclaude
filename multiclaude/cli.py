@@ -8,295 +8,40 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .config import (
+    Config,
+    config_exists,
+    get_config_value,
+    initialize_config,
+    load_config,
+    set_config_value,
+)
 from .errors import MultiClaudeError, NotInitializedError
 from .git_utils import branch_exists, is_git_repo, ref_exists
 from .strategies import get_strategy
-
-DEFAULT_AGENT = "claude"
-
-
-@dataclass
-class Task:
-    """Represents a multiclaude task."""
-
-    id: str
-    branch: str
-    created_at: str
-    status: str
-    environment_path: str
-    agent: str = DEFAULT_AGENT
-    pruned_at: str | None = None
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Task":
-        """Create Task from dictionary."""
-        normalized = data.copy()
-        agent = normalized.get("agent")
-        if not isinstance(agent, str) or not agent.strip():
-            normalized["agent"] = DEFAULT_AGENT
-        else:
-            normalized["agent"] = agent.strip()
-        return cls(**normalized)
+from .tasks import Task, TaskManager, evaluate_prune_candidate, normalize_task_selectors
 
 
-class MultiClaudeConfig:
-    """Manages multiclaude configuration."""
+def get_version() -> str:
+    """Get the multiclaude version."""
 
-    def __init__(self, repo_root: Path):
-        self.repo_root = repo_root
-        self.config_dir = repo_root / ".multiclaude"
-        self.config_file = self.config_dir / "config.json"
-
-    def exists(self) -> bool:
-        """Check if multiclaude is initialized."""
-        return self.config_dir.exists() and self.config_file.exists()
-
-    def initialize(self) -> None:
-        """Initialize multiclaude configuration."""
-        self.config_dir.mkdir(exist_ok=True)
-
-        config = {
-            "version": get_version(),
-            "repo_root": str(self.repo_root),
-            "default_branch": self._get_default_branch(),
-            "created_at": datetime.now().isoformat(),
-            "environment_strategy": "clone",
-            "default_agent": DEFAULT_AGENT,
-        }
-
-        self.config_file.write_text(json.dumps(config, indent=2))
-
-        # Add .multiclaude to .git/info/exclude
-        exclude_file = self.repo_root / ".git" / "info" / "exclude"
-        if exclude_file.exists():
-            content = exclude_file.read_text()
-            if ".multiclaude" not in content:
-                exclude_file.write_text(content + "\n.multiclaude\n")
-
-    def load(self) -> dict[str, Any]:
-        """Load configuration."""
-        if not self.exists():
-            raise NotInitializedError("Multiclaude not initialized. Run 'multiclaude init' first.")
-        config = json.loads(self.config_file.read_text())
-        if "default_agent" not in config or not isinstance(config["default_agent"], str):
-            config["default_agent"] = DEFAULT_AGENT
-        return config
-
-    def _get_default_branch(self) -> str:
-        """Get the default branch name."""
-        try:
-            result = subprocess.run(
-                ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=self.repo_root,
-            )
-            if result.returncode == 0:
-                # refs/remotes/origin/main -> main
-                return result.stdout.strip().split("/")[-1]
-        except Exception:
-            pass
-        return "main"
+    try:
+        return importlib.metadata.version("multiclaude")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 
-class TaskManager:
-    """Manages tasks in tasks.json."""
-
-    def __init__(self, repo_root: Path):
-        self.repo_root = repo_root
-        self.tasks_file = repo_root / ".multiclaude" / "tasks.json"
-
-    def initialize(self) -> None:
-        """Initialize empty tasks file."""
-        self.tasks_file.write_text("[]")
-
-    def load_tasks(self) -> list[Task]:
-        """Load all tasks."""
-        if not self.tasks_file.exists():
-            return []
-        data = json.loads(self.tasks_file.read_text())
-        return [Task.from_dict(task) for task in data]
-
-    def save_tasks(self, tasks: list[Task]) -> None:
-        """Save tasks to file."""
-        data = [asdict(task) for task in tasks]
-        self.tasks_file.write_text(json.dumps(data, indent=2))
-
-    def add_task(self, task: Task) -> None:
-        """Add a new task."""
-        tasks = self.load_tasks()
-        tasks.append(task)
-        self.save_tasks(tasks)
-
-    def get_task(self, branch_name: str) -> Task | None:
-        """Get task by branch name."""
-        tasks = self.load_tasks()
-        for task in tasks:
-            if task.branch == branch_name:
-                return task
-        return None
-
-
-def _normalize_task_selectors(raw: str) -> set[str]:
-    """Return possible task branch names for a user-provided selector."""
-
-    normalized = raw.strip()
-    if not normalized:
-        return set()
-    selectors = {normalized}
-    if not normalized.startswith("mc-"):
-        selectors.add(f"mc-{normalized}")
-    return selectors
-
-
-def _evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> dict[str, Any]:
-    """Inspect a task/environment to determine prune safety."""
-
-    env_path = Path(task.environment_path).expanduser()
-    issues: list[str] = []
-    warnings: list[str] = []
-
-    if not env_path.exists():
-        return {
-            "prune": True,
-            "reason": "Environment directory missing (stale metadata)",
-            "issues": issues,
-            "warnings": warnings,
-            "env_exists": False,
-            "cleanup_only": True,
-        }
-
-    status_proc = subprocess.run(
-        ["git", "status", "--porcelain"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-
-    if status_proc.returncode != 0:
-        details = status_proc.stderr.strip() or status_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to inspect git status: {details}")
-        if not force:
-            return {
-                "prune": False,
-                "reason": issues[0],
-                "issues": issues,
-                "warnings": warnings,
-                "env_exists": True,
-                "cleanup_only": False,
-            }
-    elif status_proc.stdout.strip():
-        issues.append("uncommitted changes present")
-
-    remote_proc = subprocess.run(
-        ["git", "remote"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-
-    if remote_proc.returncode != 0:
-        details = remote_proc.stderr.strip() or remote_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to list git remotes: {details}")
-    else:
-        remotes = {line.strip() for line in remote_proc.stdout.splitlines() if line.strip()}
-        if "origin" not in remotes:
-            issues.append("origin remote not configured (cannot verify pushed commits)")
-        else:
-            remote_branch = f"origin/{task.branch}"
-            rev_parse = subprocess.run(
-                ["git", "rev-parse", "--verify", remote_branch],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=env_path,
-            )
-            if rev_parse.returncode != 0:
-                issues.append(f"remote branch {remote_branch} not found (unpushed commits)")
-            else:
-                log_proc = subprocess.run(
-                    ["git", "log", f"{remote_branch}..HEAD"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=env_path,
-                )
-                if log_proc.returncode != 0:
-                    details = log_proc.stderr.strip() or log_proc.stdout.strip() or "unknown error"
-                    issues.append(f"failed to compare with {remote_branch}: {details}")
-                elif log_proc.stdout.strip():
-                    issues.append("unpushed commits present")
-
-    fetch_proc = subprocess.run(
-        ["git", "fetch", "--all"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-    if fetch_proc.returncode != 0:
-        details = fetch_proc.stderr.strip() or fetch_proc.stdout.strip() or "unknown error"
-        warnings.append(f"git fetch --all failed: {details}")
-
-    merged_proc = subprocess.run(
-        ["git", "branch", "--merged", default_branch],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=env_path,
-    )
-
-    merged = False
-    if merged_proc.returncode != 0:
-        details = merged_proc.stderr.strip() or merged_proc.stdout.strip() or "unknown error"
-        issues.append(f"failed to check merge status against {default_branch}: {details}")
-    else:
-        merged_branches = {
-            line.strip().lstrip("*").strip()
-            for line in merged_proc.stdout.splitlines()
-            if line.strip()
-        }
-        merged = task.branch in merged_branches
-        if not merged:
-            issues.append(f"branch not merged into {default_branch}")
-
-    if not issues and merged:
-        return {
-            "prune": True,
-            "reason": f"Branch merged into {default_branch}",
-            "issues": issues,
-            "warnings": warnings,
-            "env_exists": True,
-            "cleanup_only": False,
-        }
-
-    if force:
-        return {
-            "prune": True,
-            "reason": issues[0] if issues else f"Force pruning {task.branch}",
-            "issues": issues,
-            "warnings": warnings,
-            "env_exists": True,
-            "cleanup_only": False,
-        }
-
-    reason = issues[0] if issues else "No safe prune condition met"
-    return {
-        "prune": False,
-        "reason": reason,
-        "issues": issues,
-        "warnings": warnings,
-        "env_exists": True,
-        "cleanup_only": False,
-    }
+def validate_config() -> Config:
+    try:
+        repo_root = Path.cwd()
+        return load_config(repo_root)
+    except NotInitializedError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_init(args: argparse.Namespace) -> None:
@@ -309,12 +54,12 @@ def cmd_init(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    config = MultiClaudeConfig(repo_root)
-    if config.exists():
+    if config_exists(repo_root):
         print("Multiclaude already initialized in this repository.")
         return
 
-    config.initialize()
+    # Initialize config
+    initialize_config(repo_root, environments_dir=getattr(args, "environments_dir", None))
     task_mgr = TaskManager(repo_root)
     task_mgr.initialize()
 
@@ -325,27 +70,17 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 def cmd_new(args: argparse.Namespace) -> None:
     """Create new task with isolated environment and launch Claude."""
-    repo_root = Path.cwd()
-    mc_config = MultiClaudeConfig(repo_root)
 
-    if not mc_config.exists():
-        print("Error: Multiclaude not initialized. Run 'multiclaude init' first.", file=sys.stderr)
-        sys.exit(1)
+    config = validate_config()
+    strategy = get_strategy(config)
 
-    config = mc_config.load()
-    strategy_name = config.get("environment_strategy", "clone")
-    strategy = get_strategy(strategy_name)
-
-    agent_name = (
-        args.agent if args.agent is not None else config.get("default_agent", DEFAULT_AGENT)
-    )
-    if not isinstance(agent_name, str) or not agent_name.strip():
+    agent_name = (args.agent if args.agent is not None else config.default_agent).strip()
+    if not agent_name:
         print(
             "Error: Agent name cannot be empty. Provide a command with --agent or set default_agent in .multiclaude/config.json.",
             file=sys.stderr,
         )
         sys.exit(1)
-    agent_name = agent_name.strip()
 
     agent_path = shutil.which(agent_name)
     if agent_path is None:
@@ -357,12 +92,12 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     branch_name = f"mc-{args.branch_name}"
 
-    if branch_exists(repo_root, branch_name):
+    if branch_exists(config.repo_root, branch_name):
         print(f"Error: Branch '{branch_name}' already exists.", file=sys.stderr)
         sys.exit(1)
 
     # Validate base ref exists
-    if not ref_exists(repo_root, args.base):
+    if not ref_exists(config.repo_root, args.base):
         print(f"Error: Base ref '{args.base}' does not exist.", file=sys.stderr)
         sys.exit(1)
 
@@ -371,7 +106,9 @@ def cmd_new(args: argparse.Namespace) -> None:
     )
 
     try:
-        environment_path, was_reused = strategy.create(repo_root, branch_name, base_ref=args.base)
+        environment_path, was_reused = strategy.create(
+            config.repo_root, branch_name, base_ref=args.base
+        )
     except MultiClaudeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -385,7 +122,7 @@ def cmd_new(args: argparse.Namespace) -> None:
         environment_path=str(environment_path),
         agent=agent_name,
     )
-    task_mgr = TaskManager(repo_root)
+    task_mgr = TaskManager(config.repo_root)
     task_mgr.add_task(task)
 
     if was_reused:
@@ -403,14 +140,10 @@ def cmd_new(args: argparse.Namespace) -> None:
 
 def cmd_list(args: argparse.Namespace) -> None:
     """List all multiclaude tasks."""
-    repo_root = Path.cwd()
-    config = MultiClaudeConfig(repo_root)
 
-    if not config.exists():
-        print("Error: Multiclaude not initialized. Run 'multiclaude init' first.", file=sys.stderr)
-        sys.exit(1)
+    config = validate_config()
 
-    task_mgr = TaskManager(repo_root)
+    task_mgr = TaskManager(config.repo_root)
     tasks = task_mgr.load_tasks()
 
     if not tasks:
@@ -466,26 +199,19 @@ def cmd_list(args: argparse.Namespace) -> None:
 def cmd_prune(args: argparse.Namespace) -> None:
     """Prune completed or stale multiclaude environments."""
 
-    repo_root = Path.cwd()
-    config = MultiClaudeConfig(repo_root)
+    config = validate_config()
 
-    if not config.exists():
-        print("Error: Multiclaude not initialized. Run 'multiclaude init' first.", file=sys.stderr)
-        sys.exit(1)
+    default_branch = config.default_branch
+    strategy = get_strategy(config)
 
-    config_data = config.load()
-    default_branch = config_data.get("default_branch", "main")
-    strategy_name = config_data.get("environment_strategy", "clone")
-    strategy = get_strategy(strategy_name)
-
-    task_mgr = TaskManager(repo_root)
+    task_mgr = TaskManager(config.repo_root)
     tasks = task_mgr.load_tasks()
     if not tasks:
         print("No multiclaude tasks found.")
         return
 
     if args.task_name:
-        selectors = _normalize_task_selectors(args.task_name)
+        selectors = normalize_task_selectors(args.task_name)
         tasks_to_consider = [
             task for task in tasks if task.branch in selectors or task.id in selectors
         ]
@@ -502,7 +228,7 @@ def cmd_prune(args: argparse.Namespace) -> None:
             print(f"Skipping {task.branch}: already pruned")
             continue
 
-        evaluation = _evaluate_prune_candidate(task, default_branch, args.force)
+        evaluation = evaluate_prune_candidate(task, default_branch, args.force)
 
         for warning in evaluation.get("warnings", []):
             print(f"Warning for {task.branch}: {warning}")
@@ -564,12 +290,34 @@ def cmd_prune(args: argparse.Namespace) -> None:
         task_mgr.save_tasks(tasks)
 
 
-def get_version() -> str:
-    """Get the version of multiclaude."""
-    try:
-        return importlib.metadata.version("multiclaude")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+def cmd_config(args: argparse.Namespace) -> None:
+    """Get or set configuration values."""
+
+    config = validate_config()
+
+    if args.write is not None:
+        # Write mode
+        try:
+            config = set_config_value(config, args.path, args.write)
+            print(f"Set {args.path} = {args.write}")
+        except MultiClaudeError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Read mode
+        try:
+            value = get_config_value(config, args.path)
+            if value is None:
+                print(f"{args.path} is not set")
+            else:
+                if isinstance(value, dict | list):
+                    # Pretty print complex values
+                    print(json.dumps(value, indent=2))
+                else:
+                    print(value)
+        except MultiClaudeError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 def main() -> None:
@@ -582,6 +330,11 @@ def main() -> None:
 
     # init command
     parser_init = subparsers.add_parser("init", help="Initialize multiclaude in current repository")
+    parser_init.add_argument(
+        "--environments-dir",
+        type=Path,
+        help="Directory to store environments (default: ~/multiclaude-environments)",
+    )
     parser_init.set_defaults(func=cmd_init)
 
     # new command
@@ -616,6 +369,12 @@ def main() -> None:
     )
     parser_prune.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
     parser_prune.set_defaults(func=cmd_prune)
+
+    # config command
+    parser_config = subparsers.add_parser("config", help="Get or set configuration values")
+    parser_config.add_argument("path", help="Configuration path (e.g., environments_dir)")
+    parser_config.add_argument("--write", help="Value to write to the configuration path")
+    parser_config.set_defaults(func=cmd_config)
 
     args = parser.parse_args()
 
