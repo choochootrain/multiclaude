@@ -7,12 +7,18 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv]
-dev-dependencies = ["pytest>=8.0.0"]
+dev-dependencies = ["pytest>=8.0.0", "pytest-xdist>=3.5.0"]
 
 [project.scripts]
 multiclaude = "multiclaude:main"
 mc-sandbox = "multiclaude.mc_sandbox:main"
 sandbox-admin = "multiclaude.sandbox_admin:main"
+
+[tool.pytest.ini_options]
+addopts = [
+    "-n", "auto",  # Use pytest-xdist with auto-detection of CPU cores
+    "--dist", "worksteal",  # Better work distribution for uneven test durations
+]
 
 [build-system]
 requires = ["hatchling"]
