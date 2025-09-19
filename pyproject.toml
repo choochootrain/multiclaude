@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv]
-dev-dependencies = ["pytest>=8.0.0", "pytest-xdist>=3.5.0"]
+dev-dependencies = ["pytest>=8.0.0", "pytest-xdist>=3.5.0", "pytest-cov>=5.0.0"]
 
 [project.scripts]
 multiclaude = "multiclaude:main"
@@ -19,6 +19,12 @@ addopts = [
     "-n", "auto",  # Use pytest-xdist with auto-detection of CPU cores
     "--dist", "worksteal",  # Better work distribution for uneven test durations
 ]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.annotate]
+directory = "coverage"
 
 [build-system]
 requires = ["hatchling"]

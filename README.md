@@ -71,7 +71,7 @@ Clean up task environments and branches (future feature).
 
 1. **Isolated Environments**: Each task gets a complete git clone in `~/multiclaude-environments/`
 2. **Automatic Branching**: Creates branch `mc-<task-name>` from your specified base
-3. **Remote Configuration**: Properly configures git remotes so `git push` works intuitively  
+3. **Remote Configuration**: Properly configures git remotes so `git push` works intuitively
 4. **Claude Integration**: Automatically launches Claude Code in the task environment
 5. **Metadata Tracking**: Tracks tasks in `.multiclaude/tasks.json` for easy management
 
@@ -137,8 +137,13 @@ pytest -v
 # Run specific test file
 pytest tests/test_init.py
 
-# Run with coverage
-pytest --cov=multiclaude
+# Run with coverage (shows terminal report with missing lines)
+pytest --cov=multiclaude --cov-report=term-missing
+
+# Generate annotated coverage files showing code with coverage markers
+./scripts/coverage-annotate.sh
+# View annotated files in coverage/ directory
+# Lines marked with '>' are covered, '!' are uncovered
 ```
 
 ### Manual Testing with Sandbox

@@ -12,6 +12,8 @@ venv/
 sandbox-repo/
 sandbox-worktrees/
 repos/
+.coverage
+coverage/
 
 # IDE
 .vscode/
