@@ -28,7 +28,7 @@ def cmd_reset(args: argparse.Namespace) -> None:
         from multiclaude.cli import cmd_init
 
         # Initialize with environments_dir directly
-        args = SimpleNamespace()
+        args = SimpleNamespace()  # type: ignore[invalid-assignment]
         args.environments_dir = sandbox.worktree_path
         cmd_init(args)
 

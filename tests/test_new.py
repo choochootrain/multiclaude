@@ -150,7 +150,7 @@ def test_new_fails_when_agent_missing(initialized_repo, monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         multiclaude.cmd_new(args_new)
 
-    assert exc.value.code == 1
+    assert exc.value.code == 1  # type: ignore[unresolved-attribute]
     captured = capsys.readouterr()
     assert "Agent 'missing-agent' not found" in captured.err
 

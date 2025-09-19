@@ -132,6 +132,7 @@ def initialized_repo(isolated_repo: MCTestRepo) -> MCTestRepo:
         MCTestRepo with multiclaude already initialized
     """
     from types import SimpleNamespace
+
     from multiclaude import cli as multiclaude
 
     # Initialize multiclaude with the test environments directory

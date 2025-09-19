@@ -160,14 +160,14 @@ sandbox-admin clean         # Clean environments only
 ### Code Quality
 
 ```bash
+# Run type checking
+uvx ty check
+
 # Format code
 ruff format multiclaude/
 
 # Lint
 ruff check multiclaude/
-
-# Run type checking (if using mypy)
-mypy multiclaude/
 ```
 
 See [SPEC.md](SPEC.md) for planned features and roadmap.

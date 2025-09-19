@@ -40,7 +40,7 @@ def load_tasks(config: "Config") -> list[Task]:
     if not tasks_file.exists():
         return []
     data = json.loads(tasks_file.read_text())
-    return [Task(**task) for task in data]
+    return [Task(**task) for task in data]  # type: ignore[missing-argument]
 
 
 def save_tasks(config: "Config", tasks: list[Task]) -> None:

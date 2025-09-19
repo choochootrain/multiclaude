@@ -10,7 +10,8 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, NoReturn
 
 from .config import (
     Config,
@@ -33,8 +34,11 @@ from .tasks import (
     save_tasks,
 )
 
+# Type alias for command arguments that can be either argparse.Namespace or SimpleNamespace
+Args = argparse.Namespace | SimpleNamespace
 
-def exit_with_error(msg: str) -> None:
+
+def exit_with_error(msg: str) -> NoReturn:
     """Print error message and exit."""
     print(f"Error: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -62,7 +66,7 @@ def validate_config() -> Config:
         exit_with_error(str(e))
 
 
-def cmd_init(args: argparse.Namespace) -> None:
+def cmd_init(args: Args) -> None:
     """Initialize multiclaude in current repository."""
     repo_root = Path.cwd()
 
@@ -82,7 +86,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     print_success("Added .multiclaude to .git/info/exclude")
 
 
-def cmd_new(args: argparse.Namespace) -> None:
+def cmd_new(args: Args) -> None:
     """Create new task with isolated environment and launch Claude."""
 
     config = validate_config()
@@ -138,7 +142,7 @@ def cmd_new(args: argparse.Namespace) -> None:
         print(f"To start working, run: cd {environment_path}")
 
 
-def cmd_list(args: argparse.Namespace) -> None:
+def cmd_list(args: Args) -> None:
     """List all multiclaude tasks."""
 
     config = validate_config()
@@ -194,7 +198,7 @@ def cmd_list(args: argparse.Namespace) -> None:
             print(f"  - {task.branch}: branch {task.branch} (pruned {age_str}){agent_info}")
 
 
-def cmd_prune(args: argparse.Namespace) -> None:
+def cmd_prune(args: Args) -> None:
     """Prune completed or stale multiclaude environments."""
 
     config = validate_config()
@@ -286,7 +290,7 @@ def cmd_prune(args: argparse.Namespace) -> None:
         save_tasks(config, tasks)
 
 
-def cmd_config(args: argparse.Namespace) -> None:
+def cmd_config(args: Args) -> None:
     """Get or set configuration values."""
 
     config = validate_config()
