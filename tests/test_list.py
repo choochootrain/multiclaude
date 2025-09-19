@@ -9,13 +9,8 @@ from types import SimpleNamespace
 from multiclaude import cli as multiclaude
 
 
-def test_list_empty(isolated_repo, capsys):
+def test_list_empty(initialized_repo, capsys):
     """Test list command when no tasks exist."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # List tasks (should be empty)
     args_list = SimpleNamespace(show_pruned=False)
@@ -25,12 +20,8 @@ def test_list_empty(isolated_repo, capsys):
     assert "No multiclaude tasks found" in captured.out
 
 
-def test_list_single_task(isolated_repo, capsys):
+def test_list_single_task(initialized_repo, capsys):
     """Test list command with one task."""
-    # Initialize and create one task
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
@@ -46,12 +37,8 @@ def test_list_single_task(isolated_repo, capsys):
     assert "agent=claude" in captured.out
 
 
-def test_list_multiple_tasks(isolated_repo, capsys):
+def test_list_multiple_tasks(initialized_repo, capsys):
     """Test list command with multiple tasks."""
-    # Initialize and create multiple tasks
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     for name in ["feature-one", "feature-two", "bugfix"]:
         args_new = SimpleNamespace(branch_name=name, no_launch=True, base="main", agent=None)
@@ -72,20 +59,15 @@ def test_list_multiple_tasks(isolated_repo, capsys):
     assert captured.out.count("agent=claude") == 3
 
 
-def test_list_detects_missing_worktree(isolated_repo, capsys):
+def test_list_detects_missing_worktree(initialized_repo, capsys):
     """Test that list handles deleted worktrees gracefully."""
-    repo_path = isolated_repo.repo_path
-
-    # Initialize and create a task
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     args_new = SimpleNamespace(branch_name="feature", no_launch=True, base="main", agent=None)
     multiclaude.cmd_new(args_new)
 
     # Manually delete the environment directory (simulate external deletion)
-    environment_path = isolated_repo.environments_dir / repo_path.name / "mc-feature"
+    environment_path = initialized_repo.environments_dir / repo_path.name / "mc-feature"
     if environment_path.exists():
         shutil.rmtree(environment_path)
 
@@ -107,13 +89,9 @@ def test_list_detects_missing_worktree(isolated_repo, capsys):
     assert "[missing]" in captured.out or "missing" in captured.out.lower()
 
 
-def test_list_hides_pruned_tasks_by_default(isolated_repo, capsys):
+def test_list_hides_pruned_tasks_by_default(initialized_repo, capsys):
     """Pruned tasks should only show when --show-pruned is used."""
-    repo_path = isolated_repo.repo_path
-
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     # Create two tasks
     for name in ["old-task", "active-task"]:

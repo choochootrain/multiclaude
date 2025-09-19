@@ -9,13 +9,8 @@ import pytest
 from multiclaude import cli as multiclaude
 
 
-def test_config_read_existing_value(isolated_repo):
+def test_config_read_existing_value(initialized_repo):
     """Test reading an existing configuration value."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Read default_branch
     args_config = SimpleNamespace(path="default_branch", write=None)
@@ -38,14 +33,9 @@ def test_config_read_nonexistent_value(isolated_repo, capsys):
     assert "multiclaude-environments" in captured.out
 
 
-def test_config_write_environments_dir(isolated_repo, capsys):
+def test_config_write_environments_dir(initialized_repo, capsys):
     """Test writing environments_dir configuration."""
-    repo_path = isolated_repo.repo_path
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     # Write environments_dir
     test_dir = repo_path.parent / "test-environments"
@@ -61,14 +51,9 @@ def test_config_write_environments_dir(isolated_repo, capsys):
     assert config["environments_dir"] == str(test_dir)
 
 
-def test_config_write_environment_strategy(isolated_repo, capsys):
+def test_config_write_environment_strategy(initialized_repo, capsys):
     """Test writing environment_strategy configuration."""
-    repo_path = isolated_repo.repo_path
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     # Write valid strategy
     args_config = SimpleNamespace(path="environment_strategy", write="worktree")
@@ -83,13 +68,8 @@ def test_config_write_environment_strategy(isolated_repo, capsys):
     assert config["environment_strategy"] == "worktree"
 
 
-def test_config_write_invalid_strategy(isolated_repo, capsys):
+def test_config_write_invalid_strategy(initialized_repo, capsys):
     """Test writing invalid environment_strategy fails."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Write invalid strategy
     args_config = SimpleNamespace(path="environment_strategy", write="invalid")
@@ -101,14 +81,9 @@ def test_config_write_invalid_strategy(isolated_repo, capsys):
     assert "Invalid environment strategy: invalid" in captured.err
 
 
-def test_config_write_default_agent(isolated_repo, capsys):
+def test_config_write_default_agent(initialized_repo, capsys):
     """Test writing default_agent configuration."""
-    repo_path = isolated_repo.repo_path
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     # Write valid agent
     args_config = SimpleNamespace(path="default_agent", write="cursor")
@@ -123,13 +98,8 @@ def test_config_write_default_agent(isolated_repo, capsys):
     assert config["default_agent"] == "cursor"
 
 
-def test_config_write_invalid_agent(isolated_repo, capsys):
+def test_config_write_invalid_agent(initialized_repo, capsys):
     """Test writing empty default_agent fails."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Write empty agent
     args_config = SimpleNamespace(path="default_agent", write="")
@@ -141,13 +111,8 @@ def test_config_write_invalid_agent(isolated_repo, capsys):
     assert "Default agent must be a non-empty string" in captured.err
 
 
-def test_config_write_readonly_field(isolated_repo, capsys):
+def test_config_write_readonly_field(initialized_repo, capsys):
     """Test that writing to read-only fields fails."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Try to write to version (read-only)
     args_config = SimpleNamespace(path="version", write="2.0.0")
@@ -159,13 +124,8 @@ def test_config_write_readonly_field(isolated_repo, capsys):
     assert "Configuration key 'version' is read-only" in captured.err
 
 
-def test_config_unknown_path(isolated_repo, capsys):
+def test_config_unknown_path(initialized_repo, capsys):
     """Test that accessing unknown configuration paths fails."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Try to read unknown path
     args_config = SimpleNamespace(path="unknown_field", write=None)
@@ -177,13 +137,8 @@ def test_config_unknown_path(isolated_repo, capsys):
     assert "Unknown configuration field: unknown_field" in captured.err
 
 
-def test_config_write_unknown_path(isolated_repo, capsys):
+def test_config_write_unknown_path(initialized_repo, capsys):
     """Test that writing to unknown configuration paths fails."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Try to write to unknown path
     args_config = SimpleNamespace(path="unknown_field", write="value")
@@ -208,13 +163,8 @@ def test_config_not_initialized(isolated_repo, capsys):
     assert "Multiclaude not initialized" in captured.err
 
 
-def test_config_environments_dir_validation(isolated_repo, capsys):
+def test_config_environments_dir_validation(initialized_repo, capsys):
     """Test that environments_dir validation checks parent directory."""
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
 
     # Try to write to a path with non-existent parent
     invalid_path = "/nonexistent/parent/dir/environments"
@@ -227,14 +177,9 @@ def test_config_environments_dir_validation(isolated_repo, capsys):
     assert "Parent directory does not exist" in captured.err
 
 
-def test_config_environments_dir_expansion(isolated_repo, capsys):
+def test_config_environments_dir_expansion(initialized_repo, capsys):
     """Test that environments_dir expands ~ and resolves paths."""
-    repo_path = isolated_repo.repo_path
-
-    # Initialize first
-    args_init = SimpleNamespace()
-    args_init.environments_dir = isolated_repo.environments_dir
-    multiclaude.cmd_init(args_init)
+    repo_path = initialized_repo.repo_path
 
     # Write with ~ path
     args_config = SimpleNamespace(path="environments_dir", write="~/test-environments")

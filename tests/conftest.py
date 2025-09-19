@@ -122,6 +122,27 @@ def isolated_repo(isolated_git_repo: Path, tmp_path: Path, monkeypatch) -> MCTes
 
 
 @pytest.fixture
+def initialized_repo(isolated_repo: MCTestRepo) -> MCTestRepo:
+    """Create an isolated repository with multiclaude already initialized.
+
+    This reduces duplication across test files by providing a pre-initialized
+    multiclaude repository with standard configuration.
+
+    Returns:
+        MCTestRepo with multiclaude already initialized
+    """
+    from types import SimpleNamespace
+    from multiclaude import cli as multiclaude
+
+    # Initialize multiclaude with the test environments directory
+    args_init = SimpleNamespace()
+    args_init.environments_dir = isolated_repo.environments_dir
+    multiclaude.cmd_init(args_init)
+
+    return isolated_repo
+
+
+@pytest.fixture
 def mock_claude(monkeypatch) -> MagicMock:
     """Mock for tracking claude launches.
 
