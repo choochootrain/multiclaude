@@ -1,13 +1,18 @@
 """Administrative tools for sandbox environment."""
 
 import argparse
+import os
+import shutil
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+from multiclaude.cli import Args, cmd_init
 
 from .sandbox_utils import SandboxManager
 
 
-def cmd_reset(args: argparse.Namespace) -> None:
+def cmd_reset(args: argparse.Namespace) -> None:  # noqa: ARG001
     """Reset the sandbox environment."""
     print("Resetting sandbox environment...")
 
@@ -15,22 +20,15 @@ def cmd_reset(args: argparse.Namespace) -> None:
     sandbox.reset_sandbox()
 
     # Initialize multiclaude by calling the function directly
-    import os
-
     # Change to sandbox repo and run init
-    original_dir = os.getcwd()
+    original_dir = Path.cwd()
     try:
         os.chdir(sandbox.repo_path)
 
-        # Import and run init directly
-        from types import SimpleNamespace
-
-        from multiclaude.cli import cmd_init
-
         # Initialize with environments_dir directly
-        args = SimpleNamespace()  # type: ignore[invalid-assignment]
-        args.environments_dir = sandbox.worktree_path
-        cmd_init(args)
+        init_args: Args = SimpleNamespace()
+        init_args.environments_dir = sandbox.worktree_path
+        cmd_init(init_args)
 
         result = SimpleNamespace(returncode=0, stdout="Initialized", stderr="")
     except Exception as e:
@@ -47,21 +45,19 @@ def cmd_reset(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def cmd_clean(args: argparse.Namespace) -> None:
+def cmd_clean(args: argparse.Namespace) -> None:  # noqa: ARG001
     """Clean worktrees only."""
     print("Cleaning worktrees...")
 
     sandbox = SandboxManager(Path("repos"), "sandbox")
     if sandbox.worktree_path.exists():
-        import shutil
-
         shutil.rmtree(sandbox.worktree_path)
         sandbox.worktree_path.mkdir(parents=True)
 
     print("✓ Worktrees cleaned")
 
 
-def cmd_status(args: argparse.Namespace) -> None:
+def cmd_status(args: argparse.Namespace) -> None:  # noqa: ARG001
     """Show sandbox status."""
     sandbox = SandboxManager(Path("repos"), "sandbox")
 

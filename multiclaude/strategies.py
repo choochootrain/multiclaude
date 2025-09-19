@@ -50,7 +50,7 @@ class EnvironmentStrategy(Protocol):
 def generate_hash(length: int = 7) -> str:
     """Generate a short alphanumeric hash for available environment names."""
     chars = string.ascii_lowercase + string.digits
-    return "".join(random.choices(chars, k=length))
+    return "".join(random.choices(chars, k=length))  # noqa: S311
 
 
 def find_available_environment(base_dir: Path, repo_name: str) -> Path | None:
@@ -88,19 +88,18 @@ def make_environment_available(env_path: Path) -> None:
         available_path = env_path.parent / available_name
 
     # Clean up the git state before making it available
-    try:
-        success, error = clean_working_tree(env_path)
-        if not success:
-            raise Exception(f"Failed to clean: {error}")
-
-        default_branch = get_default_branch(env_path)
-        success, error = checkout_branch(env_path, default_branch)
-        if not success:
-            raise Exception(f"Failed to checkout default branch: {error}")
-
-    except Exception as e:
+    success, error = clean_working_tree(env_path)
+    if not success:
         # If cleanup fails, just delete the directory
-        print(f"Warning: Failed to clean environment before reuse, removing: {e}")
+        print(f"Warning: Failed to clean environment before reuse, removing: {error}")
+        shutil.rmtree(env_path)
+        return
+
+    default_branch = get_default_branch(env_path)
+    success, error = checkout_branch(env_path, default_branch)
+    if not success:
+        # If cleanup fails, just delete the directory
+        print(f"Warning: Failed to checkout default branch, removing: {error}")
         shutil.rmtree(env_path)
         return
 

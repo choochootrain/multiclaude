@@ -1,15 +1,14 @@
 """Test CloneStrategy implementation details."""
 
-import subprocess
+from pathlib import Path
 
+from multiclaude.config import Config
+from multiclaude.git_utils import git
 from multiclaude.strategies import CloneStrategy, find_available_environment, generate_hash
 
 
 def create_mock_config(base_dir):
     """Create a mock Config with the given base_dir."""
-    from pathlib import Path
-
-    from multiclaude.config import Config
 
     return Config(
         version="1.0.0",
@@ -128,9 +127,9 @@ def test_clone_strategy_remove_creates_available_environment(isolated_git_repo, 
     test_file.write_text("uncommitted changes")
 
     # Create a different branch to test reset
-    subprocess.run(
-        ["git", "checkout", "-b", "feature-branch"],
-        cwd=task_path,
+    git(
+        ["checkout", "-b", "feature-branch"],
+        task_path,
         check=True,
     )
 
@@ -151,21 +150,17 @@ def test_clone_strategy_remove_creates_available_environment(isolated_git_repo, 
     assert not (available_env / "test.txt").exists()
 
     # Should be on default branch (main or master)
-    result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        capture_output=True,
-        text=True,
-        cwd=available_env,
-        check=True,
+    code, stdout, _ = git(
+        ["branch", "--show-current"],
+        available_env,
     )
-    assert result.stdout.strip() in ["main", "master"]
+    assert code == 0
+    assert stdout in ["main", "master"]
 
     # Should have no uncommitted changes
-    status_result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        capture_output=True,
-        text=True,
-        cwd=available_env,
-        check=True,
+    code, stdout, _ = git(
+        ["status", "--porcelain"],
+        available_env,
     )
-    assert status_result.stdout.strip() == ""
+    assert code == 0
+    assert stdout == ""

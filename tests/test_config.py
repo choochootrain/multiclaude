@@ -177,7 +177,7 @@ def test_config_environments_dir_validation(initialized_repo, capsys):
     assert "Parent directory does not exist" in captured.err
 
 
-def test_config_environments_dir_expansion(initialized_repo, capsys):
+def test_config_environments_dir_expansion(initialized_repo):
     """Test that environments_dir expands ~ and resolves paths."""
     repo_path = initialized_repo.repo_path
 

@@ -2,11 +2,11 @@
 
 import json
 import shutil
-import subprocess
 from datetime import datetime
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude
+from multiclaude.git_utils import git
 
 
 def test_list_empty(initialized_repo, capsys):
@@ -72,10 +72,10 @@ def test_list_detects_missing_worktree(initialized_repo, capsys):
         shutil.rmtree(environment_path)
 
     # Also remove from git worktrees
-    subprocess.run(
-        ["git", "worktree", "prune"],
-        cwd=repo_path,
-        capture_output=True,
+    git(
+        ["worktree", "prune"],
+        repo_path,
+        check=False,
     )
 
     # List should still work but show task as missing

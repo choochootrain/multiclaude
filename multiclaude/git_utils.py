@@ -4,9 +4,9 @@ import subprocess
 from pathlib import Path
 
 
-def git(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
+def git(cmd: list[str], cwd: Path, check: bool = False) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
-    proc = subprocess.run(["git", *cmd], capture_output=True, text=True, check=False, cwd=cwd)
+    proc = subprocess.run(["git", *cmd], capture_output=True, text=True, check=check, cwd=cwd)  # noqa: S603, S607
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
 
@@ -25,11 +25,6 @@ def get_git_root(cwd: Path | None = None) -> Path | None:
 def get_repo_name(repo_root: Path) -> str:
     """Get repository name from path."""
     return repo_root.name
-
-
-def is_git_repo(repo_root: Path) -> bool:
-    """Check if directory is a git repository."""
-    return (repo_root / ".git").exists()
 
 
 def branch_exists(repo_root: Path, branch_name: str) -> bool:

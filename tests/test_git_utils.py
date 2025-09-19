@@ -1,15 +1,15 @@
 """Tests for git utility functions."""
 
 import os
-import subprocess
+from pathlib import Path
 
-from multiclaude.git_utils import get_git_root
+from multiclaude.git_utils import get_git_root, git
 
 
 def test_get_git_root_from_root(tmp_path):
     """Test getting git root when already at root."""
     # Create a git repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
+    git(["init"], tmp_path, check=True)
 
     # Get root from the root directory
     root = get_git_root(tmp_path)
@@ -19,7 +19,7 @@ def test_get_git_root_from_root(tmp_path):
 def test_get_git_root_from_subdirectory(tmp_path):
     """Test getting git root from a subdirectory."""
     # Create a git repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
+    git(["init"], tmp_path, check=True)
 
     # Create a subdirectory
     subdir = tmp_path / "subdir" / "nested"
@@ -40,14 +40,14 @@ def test_get_git_root_not_in_repo(tmp_path):
 def test_get_git_root_uses_cwd_by_default(tmp_path):
     """Test get_git_root uses current working directory by default."""
     # Create a git repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
+    git(["init"], tmp_path, check=True)
 
     # Create a subdirectory
     subdir = tmp_path / "subdir"
     subdir.mkdir()
 
     # Change to subdirectory and test without arguments
-    original_cwd = os.getcwd()
+    original_cwd = Path.cwd()
     try:
         os.chdir(subdir)
         root = get_git_root()

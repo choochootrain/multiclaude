@@ -141,7 +141,7 @@ def cmd_new(args: Args) -> None:
     if not args.no_launch:
         print(f"Launching {agent_name} in {environment_path}...")
         os.chdir(environment_path)
-        subprocess.run([agent_name], check=False)
+        subprocess.run([agent_name], check=False)  # noqa: S603
     else:
         print(f"To start working, run: cd {environment_path}")
 
@@ -312,12 +312,11 @@ def cmd_config(args: Args) -> None:
             value = get_config_value(config, args.path)
             if value is None:
                 print(f"{args.path} is not set")
+            elif isinstance(value, dict | list):
+                # Pretty print complex values
+                print(json.dumps(value, indent=2))
             else:
-                if isinstance(value, dict | list):
-                    # Pretty print complex values
-                    print(json.dumps(value, indent=2))
-                else:
-                    print(value)
+                print(value)
         except MultiClaudeError as e:
             exit_with_error(str(e))
 

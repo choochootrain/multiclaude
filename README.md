@@ -164,15 +164,24 @@ sandbox-admin clean         # Clean environments only
 
 ### Code Quality
 
+Pre-commit hooks are configured to run automatically on every commit:
+
 ```bash
-# Run type checking
-uvx ty check
+# Install pre-commit hooks (one-time setup)
+pre-commit install
 
-# Format code
-ruff format multiclaude/
+# Run all checks manually
+pre-commit run --all-files
 
-# Lint
-ruff check multiclaude/
+# Or run individual checks:
+# Type checking (strict mypy)
+mypy multiclaude/
+
+# Linting and auto-fix
+ruff check --fix
+
+# Code formatting
+ruff format
 ```
 
 See [SPEC.md](SPEC.md) for planned features and roadmap.

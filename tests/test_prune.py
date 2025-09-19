@@ -1,27 +1,24 @@
 """Tests for the multiclaude prune command."""
 
 import json
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude
+from multiclaude.git_utils import git
 from tests.conftest import configure_git_repo
 
 
 def _setup_remote(repo_path: Path) -> Path:
     """Create a bare remote repository and push main to it."""
     remote_path = repo_path.parent / f"{repo_path.name}-remote.git"
-    subprocess.run(["git", "init", "--bare", str(remote_path)], check=True, capture_output=True)
-    subprocess.run(
-        ["git", "remote", "add", "origin", str(remote_path)],
-        cwd=repo_path,
+    git(["init", "--bare", str(remote_path)], Path.cwd(), check=True)
+    git(
+        ["remote", "add", "origin", str(remote_path)],
+        repo_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(
-        ["git", "push", "-u", "origin", "main"], cwd=repo_path, check=True, capture_output=True
-    )
+    git(["push", "-u", "origin", "main"], repo_path, check=True)
     return remote_path
 
 
@@ -46,28 +43,24 @@ def test_prune_prunes_merged_branch(initialized_repo, capsys):
     # Make a commit on the task branch
     feature_file = env_path / "feature.txt"
     feature_file.write_text("feature work\n")
-    subprocess.run(["git", "add", "feature.txt"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Add feature", "--no-gpg-sign"],
-        cwd=env_path,
+    git(["add", "feature.txt"], env_path, check=True)
+    git(
+        ["commit", "-m", "Add feature", "--no-gpg-sign"],
+        env_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(
-        ["git", "push", "-u", "origin", task["branch"]],
-        cwd=env_path,
+    git(
+        ["push", "-u", "origin", task["branch"]],
+        env_path,
         check=True,
-        capture_output=True,
     )
 
     # Merge branch into main and push main back to origin
-    subprocess.run(["git", "checkout", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "pull", "origin", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "merge", task["branch"]], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "push", "origin", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "checkout", task["branch"]], cwd=env_path, check=True, capture_output=True
-    )
+    git(["checkout", "main"], env_path, check=True)
+    git(["pull", "origin", "main"], env_path, check=True)
+    git(["merge", task["branch"]], env_path, check=True)
+    git(["push", "origin", "main"], env_path, check=True)
+    git(["checkout", task["branch"]], env_path, check=True)
 
     args_prune = SimpleNamespace(task_name=None, force=False, dry_run=False, yes=True)
     multiclaude.cmd_prune(args_prune)
@@ -100,18 +93,16 @@ def test_prune_skips_unmerged_branch(initialized_repo, capsys):
     # Create commit and push branch but do NOT merge
     work_file = env_path / "work.txt"
     work_file.write_text("still working\n")
-    subprocess.run(["git", "add", "work.txt"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "WIP", "--no-gpg-sign"],
-        cwd=env_path,
+    git(["add", "work.txt"], env_path, check=True)
+    git(
+        ["commit", "-m", "WIP", "--no-gpg-sign"],
+        env_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(
-        ["git", "push", "-u", "origin", task["branch"]],
-        cwd=env_path,
+    git(
+        ["push", "-u", "origin", task["branch"]],
+        env_path,
         check=True,
-        capture_output=True,
     )
 
     args_prune = SimpleNamespace(task_name=None, force=False, dry_run=False, yes=True)
@@ -142,18 +133,16 @@ def test_prune_force_removes_dirty_environment(initialized_repo, capsys):
     # Commit and push branch so remote tracking exists
     ready_file = env_path / "ready.txt"
     ready_file.write_text("ready\n")
-    subprocess.run(["git", "add", "ready.txt"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Prep", "--no-gpg-sign"],
-        cwd=env_path,
+    git(["add", "ready.txt"], env_path, check=True)
+    git(
+        ["commit", "-m", "Prep", "--no-gpg-sign"],
+        env_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(
-        ["git", "push", "-u", "origin", task["branch"]],
-        cwd=env_path,
+    git(
+        ["push", "-u", "origin", task["branch"]],
+        env_path,
         check=True,
-        capture_output=True,
     )
 
     # Introduce dirty state
@@ -193,26 +182,22 @@ def test_prune_dry_run_does_not_change_state(initialized_repo, capsys):
     # Make commit, merge, push like in first test
     artifact = env_path / "artifact.txt"
     artifact.write_text("done\n")
-    subprocess.run(["git", "add", "artifact.txt"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Done", "--no-gpg-sign"],
-        cwd=env_path,
+    git(["add", "artifact.txt"], env_path, check=True)
+    git(
+        ["commit", "-m", "Done", "--no-gpg-sign"],
+        env_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(
-        ["git", "push", "-u", "origin", task["branch"]],
-        cwd=env_path,
+    git(
+        ["push", "-u", "origin", task["branch"]],
+        env_path,
         check=True,
-        capture_output=True,
     )
-    subprocess.run(["git", "checkout", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "pull", "origin", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "merge", task["branch"]], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(["git", "push", "origin", "main"], cwd=env_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "checkout", task["branch"]], cwd=env_path, check=True, capture_output=True
-    )
+    git(["checkout", "main"], env_path, check=True)
+    git(["pull", "origin", "main"], env_path, check=True)
+    git(["merge", task["branch"]], env_path, check=True)
+    git(["push", "origin", "main"], env_path, check=True)
+    git(["checkout", task["branch"]], env_path, check=True)
 
     dry_args = SimpleNamespace(task_name=None, force=False, dry_run=True, yes=True)
     multiclaude.cmd_prune(dry_args)

@@ -7,9 +7,13 @@ import time
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+
+from multiclaude import cli as multiclaude
+from multiclaude.git_utils import git
 
 
 def configure_git_repo(path: Path) -> None:
@@ -20,12 +24,7 @@ def configure_git_repo(path: Path) -> None:
         ("commit.gpgsign", "false"),
     ]
     for key, value in settings:
-        subprocess.run(
-            ["git", "config", key, value],
-            cwd=path,
-            capture_output=True,
-            check=True,
-        )
+        git(["config", key, value], path, check=True)
 
 
 @pytest.fixture
@@ -43,16 +42,14 @@ def isolated_git_repo(tmp_path: Path, monkeypatch) -> Generator[Path, None, None
     repo_path.mkdir(parents=True)
 
     # Initialize git repo
-    subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
+    git(["init"], repo_path, check=True)
     configure_git_repo(repo_path)
 
     # Create initial commit
     readme = repo_path / "README.md"
     readme.write_text("# Test Repository\n")
-    subprocess.run(["git", "add", "README.md"], cwd=repo_path, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True, check=True
-    )
+    git(["add", "README.md"], repo_path, check=True)
+    git(["commit", "-m", "Initial commit"], repo_path, check=True)
 
     # Change to repo directory
     monkeypatch.chdir(repo_path)
@@ -131,9 +128,6 @@ def initialized_repo(isolated_repo: MCTestRepo) -> MCTestRepo:
     Returns:
         MCTestRepo with multiclaude already initialized
     """
-    from types import SimpleNamespace
-
-    from multiclaude import cli as multiclaude
 
     # Initialize multiclaude with the test environments directory
     args_init = SimpleNamespace()
@@ -151,8 +145,6 @@ def mock_claude(monkeypatch) -> MagicMock:
         MagicMock that can be used to assert claude was called
     """
     mock = MagicMock()
-
-    import subprocess
 
     original_run = subprocess.run
 

@@ -1,10 +1,10 @@
 """Tests for multiclaude init command."""
 
 import json
-import subprocess
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude
+from multiclaude.git_utils import git
 
 
 def test_init_success(isolated_repo):
@@ -100,14 +100,14 @@ def test_init_idempotent(isolated_repo, capsys):
 def test_init_from_subdirectory(tmp_path, monkeypatch):
     """Test that init and list commands work from subdirectories."""
     # Create a git repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+    git(["init"], tmp_path, check=True)
+    git(["config", "user.email", "test@example.com"], tmp_path, check=True)
+    git(["config", "user.name", "Test User"], tmp_path, check=True)
 
     # Create initial commit
     (tmp_path / "README.md").write_text("# Test")
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
-    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=tmp_path, check=True)
+    git(["add", "."], tmp_path, check=True)
+    git(["commit", "-m", "Initial commit"], tmp_path, check=True)
 
     # Create a subdirectory
     subdir = tmp_path / "src" / "nested"

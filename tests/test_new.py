@@ -2,7 +2,6 @@
 
 import json
 import shutil
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +9,8 @@ import pytest
 
 from multiclaude import cli as multiclaude
 from multiclaude.config import load_config
+from multiclaude.git_utils import git
+from multiclaude.strategies import CloneStrategy
 
 
 def test_new_creates_task(initialized_repo):
@@ -27,13 +28,12 @@ def test_new_creates_task(initialized_repo):
     assert (expected_environment / "README.md").exists()
 
     # Check that we're on the correct branch in the environment
-    env_branch_result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["branch", "--show-current"],
+        expected_environment,
+        check=False,
     )
-    assert env_branch_result.stdout.strip() == "mc-test-feature"
+    assert stdout == "mc-test-feature"
 
     # Check tasks.json was updated
     tasks_file = repo_path / ".multiclaude" / "tasks.json"
@@ -163,8 +163,8 @@ def test_new_with_custom_base_branch(initialized_repo):
     repo_path = initialized_repo.repo_path
 
     # Create a base branch first
-    subprocess.run(["git", "checkout", "-b", "develop"], cwd=repo_path, check=True)
-    subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
+    git(["checkout", "-b", "develop"], repo_path, check=True)
+    git(["checkout", "main"], repo_path, check=True)
 
     # Create new task from develop branch
     args_new = SimpleNamespace(
@@ -178,32 +178,30 @@ def test_new_with_custom_base_branch(initialized_repo):
     assert expected_environment.exists()
 
     # Verify the branch was created from develop by checking git history
-    env_branch_result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["branch", "--show-current"],
+        expected_environment,
+        check=False,
     )
+    env_branch_result = type("obj", (object,), {"stdout": stdout, "returncode": code})()
     assert env_branch_result.stdout.strip() == "mc-feature-from-develop"
 
     # Check that the branch was created from develop by verifying the merge-base
     # The merge-base shows the common ancestor commit
-    merge_base_result = subprocess.run(
-        ["git", "merge-base", "mc-feature-from-develop", "develop"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["merge-base", "mc-feature-from-develop", "develop"],
+        expected_environment,
+        check=False,
     )
-    merge_base_commit = merge_base_result.stdout.strip()
+    merge_base_commit = stdout
 
     # Get the commit hash of develop branch
-    develop_result = subprocess.run(
-        ["git", "rev-parse", "develop"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["rev-parse", "develop"],
+        expected_environment,
+        check=False,
     )
-    develop_commit = develop_result.stdout.strip()
+    develop_commit = stdout
 
     # Verify they match (merge-base should be develop itself since we branched from it)
     assert merge_base_commit == develop_commit, (
@@ -211,13 +209,12 @@ def test_new_with_custom_base_branch(initialized_repo):
     )
 
     # Check base branch (develop) exists locally
-    branches_result = subprocess.run(
-        ["git", "branch", "-a"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["branch", "-a"],
+        expected_environment,
+        check=False,
     )
-    assert "develop" in branches_result.stdout or "remotes/local/develop" in branches_result.stdout
+    assert "develop" in stdout or "remotes/local/develop" in stdout
 
 
 def test_new_with_invalid_base_ref(initialized_repo, capsys):
@@ -242,9 +239,9 @@ def test_new_with_origin_remote(initialized_repo):
     repo_path = initialized_repo.repo_path
 
     # Add a fake GitHub remote to the base repo
-    subprocess.run(
-        ["git", "remote", "add", "origin", "git@github.com:user/repo.git"],
-        cwd=repo_path,
+    git(
+        ["remote", "add", "origin", "git@github.com:user/repo.git"],
+        repo_path,
         check=True,
     )
 
@@ -258,42 +255,38 @@ def test_new_with_origin_remote(initialized_repo):
     assert expected_environment.exists()
 
     # Check 'local' remote points to base repo
-    local_result = subprocess.run(
-        ["git", "remote", "get-url", "local"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, local_stdout, stderr = git(
+        ["remote", "get-url", "local"],
+        expected_environment,
+        check=False,
     )
-    assert local_result.returncode == 0
-    assert str(repo_path) in local_result.stdout.strip()
+    assert code == 0
+    assert str(repo_path) in local_stdout.strip()
 
     # Check 'origin' remote points to GitHub
-    origin_result = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, origin_stdout, stderr = git(
+        ["remote", "get-url", "origin"],
+        expected_environment,
+        check=False,
     )
-    assert origin_result.returncode == 0
-    assert "github.com:user/repo.git" in origin_result.stdout.strip()
+    assert code == 0
+    assert "github.com:user/repo.git" in origin_stdout
 
     # Check push.autoSetupRemote is configured
-    config_result = subprocess.run(
-        ["git", "config", "push.autoSetupRemote"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, config_stdout, stderr = git(
+        ["config", "push.autoSetupRemote"],
+        expected_environment,
+        check=False,
     )
-    assert config_result.stdout.strip() == "true"
+    assert config_stdout == "true"
 
     # Check base branch (main) exists
-    branches_result = subprocess.run(
-        ["git", "branch", "-a"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, branches_stdout, stderr = git(
+        ["branch", "-a"],
+        expected_environment,
+        check=False,
     )
-    assert "main" in branches_result.stdout or "remotes/local/main" in branches_result.stdout
+    assert "main" in branches_stdout or "remotes/local/main" in branches_stdout
 
 
 def test_new_without_origin_remote(initialized_repo):
@@ -312,42 +305,37 @@ def test_new_without_origin_remote(initialized_repo):
     assert expected_environment.exists()
 
     # Check 'local' remote exists and points to base repo
-    local_result = subprocess.run(
-        ["git", "remote", "get-url", "local"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
-    )
-    assert local_result.returncode == 0
-    assert str(repo_path) in local_result.stdout.strip()
-
-    # Check 'origin' remote does NOT exist
-    origin_result = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, local_stdout, stderr = git(
+        ["remote", "get-url", "local"],
+        expected_environment,
         check=False,
     )
-    assert origin_result.returncode != 0  # Should fail since origin doesn't exist
+    assert code == 0
+    assert str(repo_path) in local_stdout.strip()
+
+    # Check 'origin' remote does NOT exist
+    code, _, _ = git(
+        ["remote", "get-url", "origin"],
+        expected_environment,
+        check=False,
+    )
+    assert code != 0  # Should fail since origin doesn't exist
 
     # Check push.autoSetupRemote is still configured
-    config_result = subprocess.run(
-        ["git", "config", "push.autoSetupRemote"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, config_stdout, stderr = git(
+        ["config", "push.autoSetupRemote"],
+        expected_environment,
+        check=False,
     )
-    assert config_result.stdout.strip() == "true"
+    assert config_stdout == "true"
 
     # Check base branch (main) exists
-    branches_result = subprocess.run(
-        ["git", "branch", "-a"],
-        cwd=expected_environment,
-        capture_output=True,
-        text=True,
+    code, branches_stdout, stderr = git(
+        ["branch", "-a"],
+        expected_environment,
+        check=False,
     )
-    assert "main" in branches_result.stdout or "remotes/local/main" in branches_result.stdout
+    assert "main" in branches_stdout or "remotes/local/main" in branches_stdout
 
 
 def test_new_reuses_available_environment(initialized_repo, capsys):
@@ -368,7 +356,6 @@ def test_new_reuses_available_environment(initialized_repo, capsys):
 
     # Manually remove the task to create an available environment
     # (since there's no remove command yet, we use the strategy directly)
-    from multiclaude.strategies import CloneStrategy
 
     # Load config for the strategy
     config = load_config(repo_path)

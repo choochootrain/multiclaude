@@ -1,8 +1,9 @@
 """Utilities for managing sandbox environments for testing."""
 
 import shutil
-import subprocess
 from pathlib import Path
+
+from multiclaude.git_utils import git
 
 
 class SandboxManager:
@@ -27,30 +28,14 @@ class SandboxManager:
         self.worktree_path.mkdir(parents=True, exist_ok=True)
 
         # Initialize git repo
-        subprocess.run(
-            ["git", "init"],
-            cwd=self.repo_path,
-            check=True,
-            capture_output=True,
-        )
+        git(["init"], self.repo_path, check=True)
 
         # Create initial commit
         readme = self.repo_path / "README.md"
         readme.write_text(f"# Test Repository - {self.name}\n")
 
-        subprocess.run(
-            ["git", "add", "README.md"],
-            cwd=self.repo_path,
-            check=True,
-            capture_output=True,
-        )
-
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            cwd=self.repo_path,
-            check=True,
-            capture_output=True,
-        )
+        git(["add", "README.md"], self.repo_path, check=True)
+        git(["commit", "-m", "Initial commit"], self.repo_path, check=True)
 
     def reset_sandbox(self) -> None:
         """Reset sandbox by deleting and recreating it."""

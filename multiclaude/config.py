@@ -112,7 +112,7 @@ def _validate_field(field: str, value: Any) -> Any:
 
 def initialize_config(repo_root: Path, environments_dir: Path | None = None) -> Config:
     """Initialize multiclaude configuration."""
-    from .cli import get_version
+    from .cli import get_version  # noqa: PLC0415
 
     (repo_root / ".multiclaude").mkdir(exist_ok=True)
 

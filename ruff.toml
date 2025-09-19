@@ -2,11 +2,37 @@ line-length = 100
 target-version = "py311"
 
 [lint]
-select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]  # line too long - we set line-length instead
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+    "S",    # flake8-bandit (security)
+    "PTH",  # flake8-use-pathlib
+    "ARG",  # flake8-unused-arguments
+    "PL",   # Pylint
+    "TRY",  # tryceratops (exception handling)
+]
+ignore = [
+    "E501",   # line too long - we set line-length instead
+    "TRY003",  # long exception messages (often needed for clarity)
+    "PLR2004", # magic values in comparisons
+    "PLR0912", # too many branches - CLI functions need them
+    "PLR0915", # too many statements - CLI functions need them
+]
 
 [lint.per-file-ignores]
-"tests/**/test_*.py" = ["B011"]  # assert False is fine in tests
+"tests/**/test_*.py" = [
+    "B011",  # assert False is fine in tests
+    "S101",  # assert is fine in tests
+    "ARG001", # unused arguments in test fixtures
+    "S311",  # random is fine for test data
+]
 
 [format]
 quote-style = "double"

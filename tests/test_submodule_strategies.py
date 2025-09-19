@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from multiclaude.git_utils import git
 from tests.conftest import configure_git_repo
 
 
@@ -21,7 +22,7 @@ def repo_with_submodules(isolated_git_repo):
     # Create external library repo (submodule)
     lib_repo = base_dir / "shared-lib"
     lib_repo.mkdir()
-    subprocess.run(["git", "init"], cwd=lib_repo, check=True, capture_output=True)
+    git(["init"], lib_repo, check=True)
     configure_git_repo(lib_repo)
 
     # Add content to library repo
@@ -48,17 +49,16 @@ export function calculate(a, b) {
     (lib_node_modules / "uuid" / "index.js").write_text("// uuid library")
 
     # Commit library repo
-    subprocess.run(["git", "add", "."], cwd=lib_repo, check=True)
-    subprocess.run(["git", "commit", "-m", "Initial library version"], cwd=lib_repo, check=True)
+    git(["add", "."], lib_repo, check=True)
+    git(["commit", "-m", "Initial library version"], lib_repo, check=True)
 
     # Disable submodule.recurse and allow file protocol for local testing
-    subprocess.run(["git", "config", "submodule.recurse", "false"], cwd=main_repo, check=True)
-    subprocess.run(["git", "config", "protocol.file.allow", "always"], cwd=main_repo, check=True)
+    git(["config", "submodule.recurse", "false"], main_repo, check=True)
+    git(["config", "protocol.file.allow", "always"], main_repo, check=True)
 
     # Add submodule to main repo with protocol override
-    subprocess.run(
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "submodule",
@@ -66,16 +66,15 @@ export function calculate(a, b) {
             str(lib_repo),
             "libs/shared-lib",
         ],
-        cwd=main_repo,
+        main_repo,
         check=True,
     )
 
     # Initialize submodule
-    subprocess.run(
-        ["git", "submodule", "update", "--init", "--recursive"],
-        cwd=main_repo,
+    git(
+        ["submodule", "update", "--init", "--recursive"],
+        main_repo,
         check=True,
-        capture_output=True,
     )
 
     # Add main repo content that uses submodule
@@ -140,10 +139,8 @@ echo "All tests passed!"
     test_script.chmod(0o755)
 
     # Commit everything
-    subprocess.run(["git", "add", "."], cwd=main_repo, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Add main app with submodule"], cwd=main_repo, check=True
-    )
+    git(["add", "."], main_repo, check=True)
+    git(["commit", "-m", "Add main app with submodule"], main_repo, check=True)
 
     return main_repo, lib_repo
 
@@ -167,7 +164,7 @@ def create_worktree(
     else:
         cmd = ["git", "worktree", "add", str(worktree_path), branch_name]
 
-    subprocess.run(cmd, cwd=repo_path, check=True, capture_output=True)
+    git(cmd[1:], repo_path, check=True)
     return worktree_path
 
 
@@ -176,11 +173,10 @@ def setup_submodule_branch(repo_path: Path, submodule_path: str, branch_name: st
     submodule_full_path = repo_path / submodule_path
 
     # Create branch in submodule
-    subprocess.run(
-        ["git", "checkout", "-b", branch_name],
-        cwd=submodule_full_path,
+    git(
+        ["checkout", "-b", branch_name],
+        submodule_full_path,
         check=True,
-        capture_output=True,
     )
 
     # Make changes to submodule
@@ -202,20 +198,20 @@ export function newFunction_{random_suffix}() {{
 """)
 
     # Commit submodule changes
-    subprocess.run(["git", "add", "."], cwd=submodule_full_path, check=True)
+    git(["add", "."], submodule_full_path, check=True)
     configure_git_repo(submodule_full_path)
-    subprocess.run(
-        ["git", "commit", "-m", f"Update library for {branch_name} - {random_suffix}"],
-        cwd=submodule_full_path,
+    git(
+        ["commit", "-m", f"Update library for {branch_name} - {random_suffix}"],
+        submodule_full_path,
         check=True,
     )
 
     # Update main repo to reference new submodule commit
     configure_git_repo(repo_path)
-    subprocess.run(["git", "add", submodule_path], cwd=repo_path, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", f"Update submodule to {branch_name} version"],
-        cwd=repo_path,
+    git(["add", submodule_path], repo_path, check=True)
+    git(
+        ["commit", "-m", f"Update submodule to {branch_name} version"],
+        repo_path,
         check=True,
     )
 
@@ -237,11 +233,11 @@ function main() {{
 export {{ main }};
 """)
 
-    subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+    git(["add", "."], repo_path, check=True)
     configure_git_repo(repo_path)
-    subprocess.run(
-        ["git", "commit", "-m", f"Update main app for {branch_name} - {random_suffix}"],
-        cwd=repo_path,
+    git(
+        ["commit", "-m", f"Update main app for {branch_name} - {random_suffix}"],
+        repo_path,
         check=True,
     )
 
@@ -253,24 +249,20 @@ def verify_submodule_state(
     submodule_full_path = repo_path / submodule_path
 
     # Get current branch or commit
-    branch_result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        cwd=submodule_full_path,
-        capture_output=True,
-        text=True,
+    code, branch_stdout, _ = git(
+        ["branch", "--show-current"],
+        submodule_full_path,
         check=False,
     )
 
-    commit_result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=submodule_full_path,
-        capture_output=True,
-        text=True,
+    _, commit_stdout, _ = git(
+        ["rev-parse", "HEAD"],
+        submodule_full_path,
         check=True,
     )
 
-    current_branch = branch_result.stdout.strip()
-    current_commit = commit_result.stdout.strip()
+    current_branch = branch_stdout
+    current_commit = commit_stdout
 
     print(f"Submodule state: branch='{current_branch}', commit={current_commit[:8]}")
 
@@ -313,14 +305,11 @@ def test_worktree_temporary_branch_swap_with_submodules_fails(repo_with_submodul
     worktree_path = create_worktree(main_repo, branch_name)
 
     # Configure protocol override in worktree and initialize submodules
-    subprocess.run(
-        ["git", "config", "protocol.file.allow", "always"], cwd=worktree_path, check=True
-    )
-    subprocess.run(
-        ["git", "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"],
-        cwd=worktree_path,
+    git(["config", "protocol.file.allow", "always"], worktree_path, check=True)
+    git(
+        ["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"],
+        worktree_path,
         check=True,
-        capture_output=True,
     )
 
     # Set up submodule branch and make changes in worktree
@@ -334,22 +323,20 @@ def test_worktree_temporary_branch_swap_with_submodules_fails(repo_with_submodul
     )
 
     # SWAP PROCESS: Attempt to remove worktree (should fail with submodules)
-    result = subprocess.run(
-        ["git", "worktree", "remove", str(worktree_path)],
-        cwd=main_repo,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["worktree", "remove", str(worktree_path)],
+        main_repo,
         check=False,
     )
 
     # CRITICAL TEST: Verify this fails because worktrees with submodules cannot be removed
-    assert result.returncode != 0, "Expected worktree removal to fail with submodules"
-    assert "working trees containing submodules cannot be moved or removed" in result.stderr, (
-        f"Expected submodule error, got: {result.stderr}"
+    assert code != 0, "Expected worktree removal to fail with submodules"
+    assert "working trees containing submodules cannot be moved or removed" in stderr, (
+        f"Expected submodule error, got: {stderr}"
     )
 
     print("✓ CONFIRMED: Worktree temporary swap strategy FAILS with submodules")
-    print(f"  Error: {result.stderr.strip()}")
+    print(f"  Error: {stderr}")
 
     # This strategy is fundamentally incompatible with submodules
 
@@ -361,14 +348,11 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
 
     # Create worktree and set up submodule changes
     worktree_path = create_worktree(main_repo, branch_name)
-    subprocess.run(
-        ["git", "config", "protocol.file.allow", "always"], cwd=worktree_path, check=True
-    )
-    subprocess.run(
-        ["git", "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"],
-        cwd=worktree_path,
+    git(["config", "protocol.file.allow", "always"], worktree_path, check=True)
+    git(
+        ["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"],
+        worktree_path,
         check=True,
-        capture_output=True,
     )
 
     setup_submodule_branch(worktree_path, "libs/shared-lib", branch_name)
@@ -384,43 +368,36 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
     submodule_patches_dir.mkdir(exist_ok=True)
 
     # Get submodule commits that are new
-    submodule_log = subprocess.run(
-        ["git", "log", "--oneline", "main..HEAD"],
-        cwd=worktree_submodule,
-        capture_output=True,
-        text=True,
+    _, submodule_log_stdout, _ = git(
+        ["log", "--oneline", "main..HEAD"],
+        worktree_submodule,
         check=True,
     )
-    if submodule_log.stdout.strip():
-        num_submodule_commits = len(submodule_log.stdout.strip().split("\n"))
-        subprocess.run(
+    if submodule_log_stdout:
+        num_submodule_commits = len(submodule_log_stdout.split("\n"))
+        git(
             [
-                "git",
                 "format-patch",
                 f"-{num_submodule_commits}",
                 "HEAD",
                 "-o",
                 str(submodule_patches_dir),
             ],
-            cwd=worktree_submodule,
-            capture_output=True,
+            worktree_submodule,
             check=True,
         )
 
     # 2. Generate patches for main repo changes (including submodule reference updates)
-    main_log = subprocess.run(
-        ["git", "log", "--oneline", "main..HEAD"],
-        cwd=worktree_path,
-        capture_output=True,
-        text=True,
+    _, main_log_stdout, _ = git(
+        ["log", "--oneline", "main..HEAD"],
+        worktree_path,
         check=True,
     )
-    if main_log.stdout.strip():
-        num_main_commits = len(main_log.stdout.strip().split("\n"))
-        subprocess.run(
-            ["git", "format-patch", f"-{num_main_commits}", "HEAD", "-o", str(patches_dir)],
-            cwd=worktree_path,
-            capture_output=True,
+    if main_log_stdout:
+        num_main_commits = len(main_log_stdout.split("\n"))
+        git(
+            ["format-patch", f"-{num_main_commits}", "HEAD", "-o", str(patches_dir)],
+            worktree_path,
             check=True,
         )
 
@@ -430,19 +407,16 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
             main_submodule = main_repo / "libs/shared-lib"
             configure_git_repo(main_submodule)
             for patch_file in sorted(submodule_patch_files):
-                subprocess.run(
-                    ["git", "am", str(patch_file)],
-                    cwd=main_submodule,
-                    capture_output=True,
+                git(
+                    ["am", str(patch_file)],
+                    main_submodule,
                     check=True,
                 )
 
     # 4. Apply main repo patches (these will update submodule references)
     main_patch_files = [f for f in patches_dir.glob("*.patch") if f.parent == patches_dir]
     for patch_file in sorted(main_patch_files):
-        subprocess.run(
-            ["git", "am", str(patch_file)], cwd=main_repo, capture_output=True, check=True
-        )
+        git(["am", str(patch_file)], main_repo, check=True)
 
     # DON'T update submodules - this is where the complexity shows
     # The submodule reference is updated but the submodule itself is on wrong commit/branch
@@ -462,8 +436,8 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
 
     # Test reverse patching (main -> worktree)
     # First, ensure worktree is up-to-date with main repo state by fast-forwarding
-    subprocess.run(["git", "fetch", str(main_repo)], cwd=worktree_path, check=True)
-    subprocess.run(["git", "merge", "main"], cwd=worktree_path, check=True)
+    git(["fetch", str(main_repo)], worktree_path, check=True)
+    git(["merge", "main"], worktree_path, check=True)
 
     # Now make additional changes in main repo AND its submodule
     make_main_repo_changes(main_repo, f"{branch_name}-reverse")
@@ -480,22 +454,20 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
 
     # Attempt to generate patches for main repo submodule changes
     main_submodule = main_repo / "libs/shared-lib"
-    result = subprocess.run(
-        ["git", "log", "--oneline", f"{branch_name}..HEAD"],
-        cwd=main_submodule,
-        capture_output=True,
-        text=True,
+    code, stdout, stderr = git(
+        ["log", "--oneline", f"{branch_name}..HEAD"],
+        main_submodule,
         check=False,  # Expect this to fail
     )
 
     # This should fail because submodule doesn't have the branch reference
-    assert result.returncode != 0, "Expected branch reference failure in submodule"
-    assert "unknown revision" in result.stderr or "ambiguous argument" in result.stderr, (
-        f"Expected branch resolution error, got: {result.stderr}"
+    assert code != 0, "Expected branch reference failure in submodule"
+    assert "unknown revision" in stderr or "ambiguous argument" in stderr, (
+        f"Expected branch resolution error, got: {stderr}"
     )
 
     print("✓ CONFIRMED: Patch-based swap with submodules FAILS due to branch reference complexity")
-    print(f"  Error: {result.stderr.strip()}")
+    print(f"  Error: {stderr}")
     print("  Note: While theoretically possible to implement, this approach requires:")
     print("    - Complex branch reference management across repos")
     print("    - Sophisticated patch ordering and dependency resolution")
@@ -504,12 +476,6 @@ def test_worktree_patch_based_swap_with_submodules_fails(repo_with_submodules):
     print("  Conclusion: Patch-based approach is too complex for practical use with submodules")
 
     # Skip the rest of reverse patching since we've demonstrated the failure point
-    return
-
-    # Verify bidirectional sync worked
-    assert verify_full_functionality(worktree_path), "Reverse patching broke worktree"
-
-    print("✓ Patch-based swap with submodules successful")
 
 
 def test_mirror_clone_with_submodules(repo_with_submodules):
@@ -520,13 +486,12 @@ def test_mirror_clone_with_submodules(repo_with_submodules):
 
     # Create mirror clone (bare repos don't support --recursive, so we'll use different approach)
     mirror_path = base_dir / "mirror.git"
-    subprocess.run(["git", "clone", "--mirror", str(main_repo), str(mirror_path)], check=True)
+    git(["clone", "--mirror", str(main_repo), str(mirror_path)], Path.cwd(), check=True)
 
     # Clone from mirror for task work
     task_repo = base_dir / "task-from-mirror"
-    subprocess.run(
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "clone",
@@ -534,26 +499,26 @@ def test_mirror_clone_with_submodules(repo_with_submodules):
             str(mirror_path),
             str(task_repo),
         ],
+        Path.cwd(),
         check=True,
     )
 
     # Create branch and make submodule changes in task repo
-    subprocess.run(["git", "checkout", "-b", branch_name], cwd=task_repo, check=True)
+    git(["checkout", "-b", branch_name], task_repo, check=True)
     setup_submodule_branch(task_repo, "libs/shared-lib", branch_name)
     make_main_repo_changes(task_repo, branch_name)
 
     # Push main repo branch to mirror
-    subprocess.run(["git", "push", "origin", branch_name], cwd=task_repo, check=True)
+    git(["push", "origin", branch_name], task_repo, check=True)
 
     # Push submodule branch to its origin (the lib_repo)
     task_submodule = task_repo / "libs/shared-lib"
-    subprocess.run(["git", "push", "origin", branch_name], cwd=task_submodule, check=True)
+    git(["push", "origin", branch_name], task_submodule, check=True)
 
     # Clone from mirror to main work repo
     main_work = base_dir / "main-from-mirror"
-    subprocess.run(
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "clone",
@@ -561,18 +526,18 @@ def test_mirror_clone_with_submodules(repo_with_submodules):
             str(mirror_path),
             str(main_work),
         ],
+        Path.cwd(),
         check=True,
     )
 
     # Checkout branch in main work repo
-    subprocess.run(["git", "fetch", "origin"], cwd=main_work, check=True)
-    subprocess.run(["git", "checkout", branch_name], cwd=main_work, check=True)
+    git(["fetch", "origin"], main_work, check=True)
+    git(["checkout", branch_name], main_work, check=True)
 
     # Update submodules to get the right branch
-    subprocess.run(["git", "config", "protocol.file.allow", "always"], cwd=main_work, check=True)
-    subprocess.run(
+    git(["config", "protocol.file.allow", "always"], main_work, check=True)
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "submodule",
@@ -580,16 +545,13 @@ def test_mirror_clone_with_submodules(repo_with_submodules):
             "--recursive",
             "--remote",
         ],
-        cwd=main_work,
+        main_work,
         check=True,
-        capture_output=True,
     )
 
     # CRITICAL: Manually checkout the matching branch in submodule after swap
     main_work_submodule = main_work / "libs/shared-lib"
-    subprocess.run(
-        ["git", "checkout", branch_name], cwd=main_work_submodule, check=True, capture_output=True
-    )
+    git(["checkout", branch_name], main_work_submodule, check=True)
 
     # Verify submodule state and functionality
     verify_submodule_state(main_work, "libs/shared-lib")
@@ -610,9 +572,8 @@ def test_direct_clone_to_clone_with_submodules(repo_with_submodules):
 
     # Clone main repo for task work
     task_repo = base_dir / "task-direct-clone"
-    subprocess.run(
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "clone",
@@ -620,30 +581,30 @@ def test_direct_clone_to_clone_with_submodules(repo_with_submodules):
             str(main_work),
             str(task_repo),
         ],
+        Path.cwd(),  # Use current dir for clone operation
         check=True,
     )
 
     # Create branch and make changes in task repo
-    subprocess.run(["git", "checkout", "-b", branch_name], cwd=task_repo, check=True)
+    git(["checkout", "-b", branch_name], task_repo, check=True)
     setup_submodule_branch(task_repo, "libs/shared-lib", branch_name)
     make_main_repo_changes(task_repo, branch_name)
 
     # Push branch to main repo
-    subprocess.run(["git", "push", "origin", branch_name], cwd=task_repo, check=True)
+    git(["push", "origin", branch_name], task_repo, check=True)
 
     # Push submodule branch to its origin
     task_submodule = task_repo / "libs/shared-lib"
-    subprocess.run(["git", "push", "origin", branch_name], cwd=task_submodule, check=True)
+    git(["push", "origin", branch_name], task_submodule, check=True)
 
     # Fetch and checkout in main work repo
-    subprocess.run(["git", "fetch"], cwd=main_work, check=True)
-    subprocess.run(["git", "checkout", branch_name], cwd=main_work, check=True)
+    git(["fetch"], main_work, check=True)
+    git(["checkout", branch_name], main_work, check=True)
 
     # Update submodules
-    subprocess.run(["git", "config", "protocol.file.allow", "always"], cwd=main_work, check=True)
-    subprocess.run(
+    git(["config", "protocol.file.allow", "always"], main_work, check=True)
+    git(
         [
-            "git",
             "-c",
             "protocol.file.allow=always",
             "submodule",
@@ -651,16 +612,13 @@ def test_direct_clone_to_clone_with_submodules(repo_with_submodules):
             "--recursive",
             "--remote",
         ],
-        cwd=main_work,
+        main_work,
         check=True,
-        capture_output=True,
     )
 
     # CRITICAL: Manually checkout the matching branch in submodule after swap
     main_work_submodule = main_work / "libs/shared-lib"
-    subprocess.run(
-        ["git", "checkout", branch_name], cwd=main_work_submodule, check=True, capture_output=True
-    )
+    git(["checkout", branch_name], main_work_submodule, check=True)
 
     # Verify state - submodule should now be on correct branch with changes
     verify_submodule_state(main_work, "libs/shared-lib")

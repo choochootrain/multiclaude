@@ -40,7 +40,7 @@ def load_tasks(config: "Config") -> list[Task]:
     if not tasks_file.exists():
         return []
     data = json.loads(tasks_file.read_text())
-    return [Task(**task) for task in data]  # type: ignore[missing-argument]
+    return [Task(**task) for task in data]
 
 
 def save_tasks(config: "Config", tasks: list[Task]) -> None:
@@ -65,11 +65,6 @@ def create_task(
     tasks.append(task)
     save_tasks(config, tasks)
     return task
-
-
-def get_task(config: "Config", branch_name: str) -> Task | None:
-    """Get task by branch name."""
-    return next((t for t in load_tasks(config) if t.branch == branch_name), None)
 
 
 def normalize_task_selectors(raw: str) -> set[str]:
@@ -99,7 +94,7 @@ def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> di
         }
 
     issues = []
-    warnings = []
+    warnings: list[str] = []
 
     # Check working directory
     is_clean, msg = check_git_status(env_path)
@@ -133,7 +128,9 @@ def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> di
     )
 
 
-def _prune_result(prune: bool, reason: str, issues: list, warnings: list) -> dict[str, Any]:
+def _prune_result(
+    prune: bool, reason: str, issues: list[str], warnings: list[str]
+) -> dict[str, str | bool | list[str]]:
     """Create prune result dict."""
     return {
         "prune": prune,
