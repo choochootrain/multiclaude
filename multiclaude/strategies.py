@@ -154,7 +154,7 @@ class WorktreeStrategy(EnvironmentStrategy):
         # Handle ~ in paths
         expanded_path = worktree_path.expanduser()
 
-        code, _, stderr = git(["worktree", "remove", str(expanded_path)], Path.cwd())
+        code, _, stderr = git(["worktree", "remove", str(expanded_path)], self.config.repo_root)
         if code != 0:
             raise MultiClaudeError(f"Failed to remove worktree: {stderr}")
 
@@ -208,7 +208,7 @@ class CloneStrategy(EnvironmentStrategy):
             # Clone the repository with renamed remote
             code, _, stderr = git(
                 ["clone", "-o", "local", str(repo_root), str(clone_path), "--no-checkout"],
-                Path.cwd(),
+                repo_root,
             )
             if code != 0:
                 raise MultiClaudeError(f"Failed to clone repository: {stderr}")

@@ -22,7 +22,7 @@ from .config import (
     set_config_value,
 )
 from .errors import MultiClaudeError, NotInitializedError
-from .git_utils import branch_exists, is_git_repo, ref_exists
+from .git_utils import branch_exists, get_git_root, ref_exists
 from .strategies import get_strategy
 from .tasks import (
     Task,
@@ -60,30 +60,34 @@ def get_version() -> str:
 
 def validate_config() -> Config:
     try:
-        repo_root = Path.cwd()
-        return load_config(repo_root)
+        repo_root = get_git_root()
+        if repo_root is not None:
+            return load_config(repo_root)
+        exit_with_error("Not in a git repository. Please run this command in a git repo.")
     except NotInitializedError as e:
         exit_with_error(str(e))
 
 
 def cmd_init(args: Args) -> None:
     """Initialize multiclaude in current repository."""
-    repo_root = Path.cwd()
+    repo_root = get_git_root()
 
-    if not is_git_repo(repo_root):
+    if repo_root is not None:
+        if config_exists(repo_root):
+            print("Multiclaude already initialized in this repository.")
+            return
+
+        # Initialize config and tasks
+        config = initialize_config(
+            repo_root, environments_dir=getattr(args, "environments_dir", None)
+        )
+        initialize_tasks(config)
+
+        print_success("Initialized multiclaude in this repository")
+        print_success("Created .multiclaude/ directory")
+        print_success("Added .multiclaude to .git/info/exclude")
+    else:
         exit_with_error("Not a git repository. Please run this command in a git repo.")
-
-    if config_exists(repo_root):
-        print("Multiclaude already initialized in this repository.")
-        return
-
-    # Initialize config and tasks
-    config = initialize_config(repo_root, environments_dir=getattr(args, "environments_dir", None))
-    initialize_tasks(config)
-
-    print_success("Initialized multiclaude in this repository")
-    print_success("Created .multiclaude/ directory")
-    print_success("Added .multiclaude to .git/info/exclude")
 
 
 def cmd_new(args: Args) -> None:

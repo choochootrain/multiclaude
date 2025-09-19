@@ -1,6 +1,7 @@
 """Tests for multiclaude init command."""
 
 import json
+import subprocess
 from types import SimpleNamespace
 
 from multiclaude import cli as multiclaude
@@ -94,3 +95,35 @@ def test_init_idempotent(isolated_repo, capsys):
     exclude_lines = exclude_file.read_text().strip().split("\n")
     multiclaude_count = sum(1 for line in exclude_lines if line.strip() == ".multiclaude")
     assert multiclaude_count == 1
+
+
+def test_init_from_subdirectory(tmp_path, monkeypatch):
+    """Test that init and list commands work from subdirectories."""
+    # Create a git repo
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+
+    # Create initial commit
+    (tmp_path / "README.md").write_text("# Test")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=tmp_path, check=True)
+
+    # Create a subdirectory
+    subdir = tmp_path / "src" / "nested"
+    subdir.mkdir(parents=True)
+
+    # Change to subdirectory
+    monkeypatch.chdir(subdir)
+
+    # Initialize multiclaude from subdirectory
+    args = SimpleNamespace(environments_dir=None)
+    multiclaude.cmd_init(args)
+
+    # Verify config was created in repo root, not current directory
+    assert (tmp_path / ".multiclaude" / "config.json").exists()
+    assert not (subdir / ".multiclaude" / "config.json").exists()
+
+    # Test list command from subdirectory
+    args = SimpleNamespace()
+    multiclaude.cmd_list(args)  # Should not raise NotInitializedError

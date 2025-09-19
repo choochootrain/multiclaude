@@ -10,6 +10,18 @@ def git(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
 
+def get_git_root(cwd: Path | None = None) -> Path | None:
+    """Get the root of the git repository containing the current or given directory.
+
+    Returns None if not in a git repository.
+    """
+    working_dir = cwd or Path.cwd()
+    code, stdout, _ = git(["rev-parse", "--show-toplevel"], working_dir)
+    if code == 0 and stdout:
+        return Path(stdout)
+    return None
+
+
 def get_repo_name(repo_root: Path) -> str:
     """Get repository name from path."""
     return repo_root.name
