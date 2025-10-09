@@ -20,17 +20,18 @@ def test_config_read_existing_value(initialized_repo):
 def test_config_read_nonexistent_value(isolated_repo, capsys):
     """Test reading a configuration value that doesn't exist."""
 
-    # Initialize first - don't set environments_dir so it gets default
-    args_init = SimpleNamespace()
+    # Initialize first with test environments dir
+    test_envs = isolated_repo.environments_dir
+    args_init = SimpleNamespace(environments_dir=test_envs)
     multiclaude.cmd_init(args_init)
 
-    # Read environments_dir - should show the default
+    # Read environments_dir - should show the test path
     args_config = SimpleNamespace(path="environments_dir", write=None)
     multiclaude.cmd_config(args_config)
 
     captured = capsys.readouterr()
-    # When environments_dir is not explicitly set, it uses the default
-    assert "multiclaude-environments" in captured.out
+    # Should show the test environments directory path
+    assert str(test_envs) in captured.out
 
 
 def test_config_write_environments_dir(initialized_repo, capsys):

@@ -12,7 +12,7 @@ def test_init_success(isolated_repo):
     repo_path = isolated_repo.repo_path
 
     # Create args object and call init directly
-    args = SimpleNamespace()
+    args = SimpleNamespace(environments_dir=isolated_repo.environments_dir)
     multiclaude.cmd_init(args)
 
     # Check .multiclaude directory exists
@@ -71,7 +71,7 @@ def test_init_idempotent(isolated_repo, capsys):
     repo_path = isolated_repo.repo_path
 
     # Run init first time
-    args = SimpleNamespace()
+    args = SimpleNamespace(environments_dir=isolated_repo.environments_dir)
     multiclaude.cmd_init(args)
 
     # Get original config
@@ -117,7 +117,8 @@ def test_init_from_subdirectory(tmp_path, monkeypatch):
     monkeypatch.chdir(subdir)
 
     # Initialize multiclaude from subdirectory
-    args = SimpleNamespace(environments_dir=None)
+    test_envs = tmp_path / "test-environments"
+    args = SimpleNamespace(environments_dir=test_envs)
     multiclaude.cmd_init(args)
 
     # Verify config was created in repo root, not current directory
@@ -125,5 +126,5 @@ def test_init_from_subdirectory(tmp_path, monkeypatch):
     assert not (subdir / ".multiclaude" / "config.json").exists()
 
     # Test list command from subdirectory
-    args = SimpleNamespace()
+    args = SimpleNamespace(show_pruned=False)
     multiclaude.cmd_list(args)  # Should not raise NotInitializedError
