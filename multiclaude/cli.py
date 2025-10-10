@@ -6,7 +6,6 @@ import importlib.metadata
 import json
 import os
 import shutil
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +27,7 @@ from .tasks import (
     Task,
     create_task,
     evaluate_prune_candidate,
+    find_task_by_selector,
     initialize_tasks,
     load_tasks,
     normalize_task_selectors,
@@ -141,7 +141,7 @@ def cmd_new(args: Args) -> None:
     if not args.no_launch:
         print(f"Launching {agent_name} in {environment_path}...")
         os.chdir(environment_path)
-        subprocess.run([agent_name], check=False)  # noqa: S603
+        os.execvp(agent_name, [agent_name])  # noqa: S606
     else:
         print(f"To start working, run: cd {environment_path}")
 
@@ -321,6 +321,63 @@ def cmd_config(args: Args) -> None:
             exit_with_error(str(e))
 
 
+def cmd_resume(args: Args) -> None:
+    """Resume work on an existing task by launching agent in task environment."""
+
+    config = validate_config()
+
+    try:
+        task = find_task_by_selector(config, args.task_name)
+    except MultiClaudeError as e:
+        exit_with_error(str(e))
+
+    # Verify environment exists
+    env_path = Path(task.environment_path).expanduser()
+    if not env_path.exists():
+        exit_with_error(
+            f"Task environment missing: {env_path}\n"
+            f"The environment for task '{task.branch}' no longer exists."
+        )
+
+    print(f"Resuming task '{task.branch}' in {env_path}...")
+    os.chdir(env_path)
+
+    # Launch agent with resume flag if supported
+    if task.agent == "claude":
+        os.execvp(task.agent, [task.agent, "-r"])  # noqa: S606
+    else:
+        # TODO: Add resume flag support for other agents when available
+        print(f"Note: Resume flag not yet supported for {task.agent}, launching normally")
+        os.execvp(task.agent, [task.agent])  # noqa: S606
+
+
+def cmd_cd(args: Args) -> None:
+    """Change to task environment directory by spawning a subshell."""
+
+    config = validate_config()
+
+    try:
+        task = find_task_by_selector(config, args.task_name)
+    except MultiClaudeError as e:
+        exit_with_error(str(e))
+
+    # Verify environment exists
+    env_path = Path(task.environment_path).expanduser()
+    if not env_path.exists():
+        exit_with_error(
+            f"Task environment missing: {env_path}\n"
+            f"The environment for task '{task.branch}' no longer exists."
+        )
+
+    print(f"Opening shell in task '{task.branch}' at {env_path}...")
+    print("(Type 'exit' to return to your original directory)")
+    os.chdir(env_path)
+
+    # Get user's shell and exec into it
+    shell = os.environ.get("SHELL", "/bin/bash")
+    os.execvp(shell, [shell])  # noqa: S606
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -376,6 +433,22 @@ def main() -> None:
     parser_config.add_argument("path", help="Configuration path (e.g., environments_dir)")
     parser_config.add_argument("--write", help="Value to write to the configuration path")
     parser_config.set_defaults(func=cmd_config)
+
+    # resume command
+    parser_resume = subparsers.add_parser(
+        "resume", help="Resume work on existing task (launches agent with -r flag)"
+    )
+    parser_resume.add_argument(
+        "task_name", help="Task name or branch (supports partial matching, e.g., 'feature')"
+    )
+    parser_resume.set_defaults(func=cmd_resume)
+
+    # cd command
+    parser_cd = subparsers.add_parser("cd", help="Open shell in task environment directory")
+    parser_cd.add_argument(
+        "task_name", help="Task name or branch (supports partial matching, e.g., 'feature')"
+    )
+    parser_cd.set_defaults(func=cmd_cd)
 
     args = parser.parse_args()
 

@@ -93,8 +93,16 @@ def test_new_short_n_flag(initialized_repo, capsys):
     assert "Created new environment" in captured.out
 
 
-def test_new_would_launch_claude(initialized_repo, capsys):
+def test_new_would_launch_claude(initialized_repo, capsys, monkeypatch):
     """Test that without --no-launch, the agent is launched."""
+
+    # Mock os.execvp to prevent actual execution
+    exec_called = []
+
+    def mock_execvp(file, args):
+        exec_called.append((file, args))
+
+    monkeypatch.setattr("os.execvp", mock_execvp)
 
     # Create task without --no-launch (this will launch claude, but mocked)
     args_new = SimpleNamespace(branch_name="test", no_launch=False, base="main", agent=None)
@@ -105,6 +113,10 @@ def test_new_would_launch_claude(initialized_repo, capsys):
     assert "Launching claude" in captured.out
     # Should create new environment
     assert "Created new environment" in captured.out
+
+    # Verify execvp was called with correct arguments
+    assert len(exec_called) == 1
+    assert exec_called[0] == ("claude", ["claude"])
 
 
 def test_new_with_custom_agent_flag(initialized_repo, capsys):

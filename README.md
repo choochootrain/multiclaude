@@ -64,8 +64,48 @@ Creates branch `mc-<branch-name>` and isolated environment in `~/multiclaude-env
 ### `multiclaude list`
 List all multiclaude-managed tasks with creation times and status.
 
-### `multiclaude prune [<task-name>]` (planned)
-Clean up task environments and branches (future feature).
+**Options:**
+- `--show-pruned` - Include pruned tasks in the output
+
+### `multiclaude resume <task-name>`
+Resume work on an existing task by launching the agent in the task environment.
+
+- Supports partial task name matching (e.g., `resume feature` matches `mc-feature`)
+- Changes to task directory and launches agent
+- For Claude agent, uses `-r` flag to resume previous conversation
+- When you exit the agent, you'll remain in the task directory
+
+**Examples:**
+```bash
+# Resume by partial name
+multiclaude resume feature
+
+# Resume by full branch name
+multiclaude resume mc-feature-auth
+```
+
+### `multiclaude cd <task-name>`
+Open a shell in the task environment directory.
+
+- Supports partial task name matching (e.g., `cd feature` matches `mc-feature`)
+- Spawns a subshell in the task directory
+- Type `exit` to return to your original location
+
+**Examples:**
+```bash
+# Open shell in task directory
+multiclaude cd feature
+# ... do work ...
+exit  # returns to original directory
+```
+
+### `multiclaude prune [<task-name>]`
+Clean up completed or stale task environments.
+
+**Options:**
+- `--force` - Override safety checks and prune anyway
+- `--dry-run` - Show what would be pruned without making changes
+- `--yes` - Skip confirmation prompt
 
 ## How It Works
 
@@ -105,12 +145,21 @@ multiclaude new auth-bugfix
 # Check on all tasks
 multiclaude list
 
+# Resume a task later
+multiclaude resume dark-mode  # Resumes Claude with -r flag
+
+# Or just open a shell in a task directory
+multiclaude cd dark-mode      # Opens subshell in task directory
+# ... manual work ...
+exit
+
 # When done, create PRs from each environment
-cd ~/multiclaude-environments/my-repo/mc-dark-mode
+multiclaude cd dark-mode
 git add -A
 git commit -m "Add dark mode support"
 git push -u origin mc-dark-mode
 gh pr create
+exit  # Return to original directory
 ```
 
 ## Development

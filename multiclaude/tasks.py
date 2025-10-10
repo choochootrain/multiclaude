@@ -140,3 +140,37 @@ def _prune_result(
         "env_exists": True,
         "cleanup_only": False,
     }
+
+
+def find_task_by_selector(config: "Config", selector: str) -> Task:
+    """Find a task by name/ID selector.
+
+    Supports partial matching (e.g., 'feature' matches 'mc-feature').
+    Raises MultiClaudeError if no match or multiple matches found.
+    """
+    from .errors import MultiClaudeError  # noqa: PLC0415
+
+    tasks = load_tasks(config)
+    if not tasks:
+        raise MultiClaudeError("No tasks found. Create one with 'multiclaude new'.")
+
+    # Get possible selectors (handles mc- prefix)
+    selectors = normalize_task_selectors(selector)
+
+    # Find matching tasks (exclude pruned)
+    matches = [
+        task
+        for task in tasks
+        if (task.branch in selectors or task.id in selectors) and task.status != "pruned"
+    ]
+
+    if not matches:
+        raise MultiClaudeError(f"No task found matching '{selector}'.")
+
+    if len(matches) > 1:
+        branch_list = ", ".join(t.branch for t in matches)
+        raise MultiClaudeError(
+            f"Multiple tasks match '{selector}': {branch_list}. Please be more specific."
+        )
+
+    return matches[0]
