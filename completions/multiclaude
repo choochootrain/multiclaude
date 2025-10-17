@@ -1,0 +1,65 @@
+#compdef multiclaude
+
+_multiclaude_completion_tasks() {
+    command -v multiclaude >/dev/null 2>&1 || return 1
+    local out
+    out=$(multiclaude list --quiet 2>/dev/null)
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}
+
+if [ -n "${BASH_VERSION-}" ]; then
+    _multiclaude_bash_complete() {
+        local cur subcmd tasks
+        COMPREPLY=()
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        subcmd="${COMP_WORDS[1]-}"
+
+        if [ $COMP_CWORD -le 1 ]; then
+            local opts="init new list prune resume cd config"
+            COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+            return
+        fi
+
+        case "$subcmd" in
+            resume|cd)
+                tasks=$(_multiclaude_completion_tasks || printf '')
+                if [ -n "$tasks" ]; then
+                    COMPREPLY=( $(compgen -W "$tasks" -- "$cur") )
+                fi
+                ;;
+        esac
+    }
+
+    complete -F _multiclaude_bash_complete multiclaude
+elif [ -n "${ZSH_VERSION-}" ]; then
+    _multiclaude_zsh_complete() {
+        local -a tasks
+
+        local curcontext="$curcontext" state
+        local -A opt_args
+        _arguments -C \
+            '1:command:(init new list prune resume cd config)' \
+            '*:task:->task'
+
+        case $state in
+            task)
+                if [[ $words[2] == resume || $words[2] == cd ]]; then
+                    local task_output
+                    task_output=$(_multiclaude_completion_tasks || printf '')
+                    if [[ -n "$task_output" ]]; then
+                        local -a task_array
+                        task_array=("${(@f)task_output}")
+                        compadd -a task_array
+                    else
+                        _message 'no tasks'
+                    fi
+                fi
+                ;;
+        esac
+
+        return 0
+    }
+
+    compdef _multiclaude_zsh_complete multiclaude
+fi

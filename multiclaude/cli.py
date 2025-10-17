@@ -153,10 +153,11 @@ def cmd_list(args: Args) -> None:
     tasks = load_tasks(config)
 
     if not tasks:
+        if args.quiet:
+            return
         print("No multiclaude tasks found.")
         return
 
-    # Separate active and pruned tasks
     active_tasks = []
     pruned_tasks = []
 
@@ -165,14 +166,20 @@ def cmd_list(args: Args) -> None:
             pruned_tasks.append(task)
             continue
 
-        # Check if environment still exists
         environment_exists = Path(task.environment_path).expanduser().exists()
 
         if not environment_exists:
             task.status = "missing"
         active_tasks.append(task)
 
-    # Display active tasks
+    if args.quiet:
+        for task in active_tasks:
+            print(task.branch)
+        if args.show_pruned:
+            for task in pruned_tasks:
+                print(task.branch)
+        return
+
     if active_tasks:
         print("Active multiclaude tasks:")
         for task in active_tasks:
@@ -191,7 +198,6 @@ def cmd_list(args: Args) -> None:
                 f"  - {task.branch}: branch {task.branch} (created {age_str}){status}{agent_info}"
             )
 
-    # Display pruned tasks if any
     if pruned_tasks and args.show_pruned:
         print("\nPruned tasks (metadata retained):")
         for task in pruned_tasks:
@@ -416,6 +422,12 @@ def main() -> None:
     # list command
     parser_list = subparsers.add_parser("list", help="List all multiclaude tasks")
     parser_list.add_argument("--show-pruned", action="store_true", help="Show pruned tasks")
+    parser_list.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Output only task names (one per line)",
+    )
     parser_list.set_defaults(func=cmd_list)
 
     # prune command

@@ -99,6 +99,21 @@ multiclaude cd feature
 exit  # returns to original directory
 ```
 
+### Shell Completion
+
+Multiclaude ships with bash and zsh completions so `resume` and `cd` subcommands offer task suggestions (both full and short names).
+
+```bash
+# Bash
+source /path/to/repo/completions/multiclaude
+
+# Zsh (after compinit)
+source /path/to/repo/completions/multiclaude
+compdef _multiclaude_zsh_complete multiclaude
+```
+
+Add the relevant `source` line to your shell rc file to enable completions for future sessions.
+
 ### `multiclaude prune [<task-name>]`
 Clean up completed or stale task environments.
 

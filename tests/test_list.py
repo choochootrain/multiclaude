@@ -13,7 +13,7 @@ def test_list_empty(initialized_repo, capsys):
     """Test list command when no tasks exist."""
 
     # List tasks (should be empty)
-    args_list = SimpleNamespace(show_pruned=False)
+    args_list = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args_list)
 
     captured = capsys.readouterr()
@@ -27,7 +27,7 @@ def test_list_single_task(initialized_repo, capsys):
     multiclaude.cmd_new(args_new)
 
     # List tasks
-    args_list = SimpleNamespace(show_pruned=False)
+    args_list = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args_list)
 
     captured = capsys.readouterr()
@@ -45,7 +45,7 @@ def test_list_multiple_tasks(initialized_repo, capsys):
         multiclaude.cmd_new(args_new)
 
     # List tasks
-    args_list = SimpleNamespace(show_pruned=False)
+    args_list = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args_list)
 
     captured = capsys.readouterr()
@@ -79,7 +79,7 @@ def test_list_detects_missing_worktree(initialized_repo, capsys):
     )
 
     # List should still work but show task as missing
-    args_list = SimpleNamespace(show_pruned=False)
+    args_list = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args_list)
 
     captured = capsys.readouterr()
@@ -109,7 +109,7 @@ def test_list_hides_pruned_tasks_by_default(initialized_repo, capsys):
     capsys.readouterr()
 
     # Without --show-pruned we should only see the active task
-    args_list = SimpleNamespace(show_pruned=False)
+    args_list = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args_list)
     captured = capsys.readouterr()
     assert "mc-active-task" in captured.out
@@ -117,9 +117,58 @@ def test_list_hides_pruned_tasks_by_default(initialized_repo, capsys):
 
     # With --show-pruned the pruned task should appear in the pruned section
     capsys.readouterr()
-    args_list_pruned = SimpleNamespace(show_pruned=True)
+    args_list_pruned = SimpleNamespace(show_pruned=True, quiet=False)
     multiclaude.cmd_list(args_list_pruned)
     captured = capsys.readouterr()
     assert "Pruned tasks" in captured.out
     assert "mc-old-task" in captured.out
     assert "mc-active-task" in captured.out
+
+
+def test_list_quiet_outputs_branch_and_short(initialized_repo, capsys):
+    args_new = SimpleNamespace(branch_name="feature-one", no_launch=True, base="main", agent=None)
+    multiclaude.cmd_new(args_new)
+
+    capsys.readouterr()
+
+    args_list = SimpleNamespace(show_pruned=False, quiet=True)
+    multiclaude.cmd_list(args_list)
+
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [
+        "mc-feature-one",
+    ]
+
+
+def test_list_quiet_filters_pruned(initialized_repo, capsys):
+    repo_path = initialized_repo.repo_path
+
+    args_new = SimpleNamespace(branch_name="alpha", no_launch=True, base="main", agent=None)
+    multiclaude.cmd_new(args_new)
+
+    args_new = SimpleNamespace(branch_name="beta", no_launch=True, base="main", agent=None)
+    multiclaude.cmd_new(args_new)
+
+    tasks_file = repo_path / ".multiclaude" / "tasks.json"
+    tasks = json.loads(tasks_file.read_text())
+    tasks[0]["status"] = "pruned"
+    tasks[0]["pruned_at"] = datetime.now().isoformat()
+    tasks_file.write_text(json.dumps(tasks, indent=2))
+
+    capsys.readouterr()
+
+    args_list = SimpleNamespace(show_pruned=False, quiet=True)
+    multiclaude.cmd_list(args_list)
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [
+        "mc-beta",
+    ]
+
+    capsys.readouterr()
+    args_list_pruned = SimpleNamespace(show_pruned=True, quiet=True)
+    multiclaude.cmd_list(args_list_pruned)
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [
+        "mc-beta",
+        "mc-alpha",
+    ]

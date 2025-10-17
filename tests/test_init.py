@@ -126,5 +126,5 @@ def test_init_from_subdirectory(tmp_path, monkeypatch):
     assert not (subdir / ".multiclaude" / "config.json").exists()
 
     # Test list command from subdirectory
-    args = SimpleNamespace(show_pruned=False)
+    args = SimpleNamespace(show_pruned=False, quiet=False)
     multiclaude.cmd_list(args)  # Should not raise NotInitializedError
