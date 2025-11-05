@@ -93,6 +93,10 @@ def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> di
             "cleanup_only": True,
         }
 
+    # Skip all safety checks when force is enabled
+    if force:
+        return _prune_result(True, f"Force pruning {task.branch}", [], [])
+
     issues = []
     warnings: list[str] = []
 
@@ -118,10 +122,6 @@ def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> di
     # Make prune decision
     if not issues and is_merged:
         return _prune_result(True, f"Branch merged into {default_branch}", issues, warnings)
-
-    if force:
-        reason = issues[0] if issues else f"Force pruning {task.branch}"
-        return _prune_result(True, reason, issues, warnings)
 
     return _prune_result(
         False, issues[0] if issues else "No safe prune condition met", issues, warnings

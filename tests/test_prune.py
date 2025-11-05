@@ -149,17 +149,20 @@ def test_prune_force_removes_dirty_environment(initialized_repo, capsys):
     dirty_file = env_path / "dirty.txt"
     dirty_file.write_text("dirty\n")
 
+    # Without force, prune should skip due to uncommitted changes
     args_prune = SimpleNamespace(task_name=None, force=False, dry_run=False, yes=True)
     multiclaude.cmd_prune(args_prune)
     captured = capsys.readouterr()
     assert "Skipping" in captured.out
     assert "uncommitted" in captured.out
 
-    # Force prune
+    # With force, prune should skip all safety checks and proceed immediately
     force_args = SimpleNamespace(task_name=None, force=True, dry_run=False, yes=True)
     multiclaude.cmd_prune(force_args)
     captured = capsys.readouterr()
     assert "Force pruning" in captured.out
+    # Force mode skips all git checks, so no issues should be detected
+    assert "uncommitted" not in captured.out
 
     updated_task = _read_tasks(repo_path)[0]
     assert updated_task["status"] == "pruned"
