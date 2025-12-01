@@ -111,8 +111,8 @@ def evaluate_prune_candidate(task: Task, default_branch: str, force: bool) -> di
     issues.extend(check_unpushed_commits(env_path, task.branch))
 
     # Fetch latest (non-blocking)
-    if git(["fetch", "--all"], env_path)[0] != 0:
-        warnings.append("git fetch --all failed")
+    if git(["fetch", "origin", task.branch], env_path)[0] != 0:
+        warnings.append(f"git fetch origin {task.branch} failed")
 
     # Check merge status
     is_merged, msg = is_branch_merged(env_path, task.branch, default_branch)
