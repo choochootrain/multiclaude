@@ -9,6 +9,7 @@ Manage parallel Claude Code instances with isolated git environments. Each task 
 - Git
 - Claude Code CLI (`claude`)
 - Python 3.11+
+- uv
 - mise (optional, for automatic tool installation)
 
 ### Quick Start
@@ -17,30 +18,11 @@ Manage parallel Claude Code instances with isolated git environments. Each task 
 # Install tools (if using mise)
 mise install
 
-# Create virtual environment and install
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
+# Install multiclaude as a tool available on your path
+uv tool install multiclaude
 
-# Now you can use multiclaude from anywhere (while venv is active)
-multiclaude --help
-```
-
-Alternative using uv run (no activation needed):
-```bash
-# Create venv and install
-uv venv
-uv pip install -e .
-
-# Run with uv (no activation needed)
-uv run multiclaude --help
-```
-
-Alternative without installing:
-```bash
-# Make executable and run directly
-chmod +x multiclaude.py
-./multiclaude.py --help
+# Now you can use multiclaude from anywhere
+cd $PROJECT; multiclaude --help
 ```
 
 ## Commands
@@ -52,12 +34,16 @@ Initialize multiclaude in the current git repository.
 - Initializes metadata files
 - Adds `.multiclaude` to `.git/info/exclude`
 
+**Options:**
+- `--environments-dir <path>` - Directory to store environments (default: ~/multiclaude-environments)
+
 ### `multiclaude new <branch-name>`
 Create new Claude task with isolated git environment and launch Claude Code.
 
 **Options:**
-- `--no-launch` - Create environment without launching Claude
+- `--no-launch/-n` - Create environment without launching Claude
 - `--base <ref>` - Branch from specific branch/tag/commit (default: main)
+- `--agent/-a <command>` - Command to launch for this task's agent (defaults to config default_agent)
 
 Creates branch `mc-<branch-name>` and isolated environment in `~/multiclaude-environments/<repo-name>/mc-<branch-name>/`
 
@@ -66,6 +52,7 @@ List all multiclaude-managed tasks with creation times and status.
 
 **Options:**
 - `--show-pruned` - Include pruned tasks in the output
+- `-q/--quiet` - Output only task names (one per line)
 
 ### `multiclaude resume <task-name>`
 Resume work on an existing task by launching the agent in the task environment.
@@ -114,6 +101,22 @@ compdef _multiclaude_zsh_complete multiclaude
 
 Add the relevant `source` line to your shell rc file to enable completions for future sessions.
 
+### `multiclaude config <path>`
+Get or set configuration values.
+
+**Options:**
+- `--write <value>` - Value to write to the configuration path
+
+**Examples:**
+```bash
+# Read a config value
+multiclaude config environments_dir
+multiclaude config default_agent
+
+# Set a config value
+multiclaude config default_agent --write "claude"
+```
+
 ### `multiclaude prune [<task-name>]`
 Clean up completed or stale task environments.
 
@@ -129,6 +132,17 @@ Clean up completed or stale task environments.
 3. **Remote Configuration**: Properly configures git remotes so `git push` works intuitively
 4. **Claude Integration**: Automatically launches Claude Code in the task environment
 5. **Metadata Tracking**: Tracks tasks in `.multiclaude/tasks.json` for easy management
+
+## Why Clones Instead of Worktrees?
+
+Git worktrees seem like the obvious choice for parallel development, but have limitations ([git-worktree bugs in git 2.52.0](https://git-scm.com/docs/git-worktree/2.52.0#_bugs)):
+
+- **Submodule support is incomplete**: Support for worktrees containing submodules is incomplete
+- **Multiple checkout is experimental**: Checking out the same branch in multiple worktrees is still experimental
+
+Full clones provide complete flexibility for repos with submodules and allow checking out the same branch multiple times. The tradeoff is managing branch state between clones (pushing/fetching to sync changes).
+
+The isolation strategy is extensible so worktrees can become the default when git natively addresses these limitations.
 
 ## Directory Structure
 
